@@ -456,6 +456,11 @@ GPRT_API void gprtTrianglesSetVertices(GPRTGeom triangles,
                                       size_t count,
                                       size_t stride,
                                       size_t offset);
+GPRT_API void gprtTrianglesSetVertexColor(GPRTGeom _triangles,
+                                          GPRTBuffer _colors,
+                                          size_t count,
+                                          size_t stride,
+                                          size_t offset);
 // GPRT_API void gprtTrianglesSetMotionVertices(GPRTGeom triangles,
 //                                            /*! number of vertex arrays
 //                                                passed here, the first

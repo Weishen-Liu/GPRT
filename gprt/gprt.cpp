@@ -935,6 +935,13 @@ struct TriangleGeom : public Geom {
     std::vector<Buffer*> buffers;
   } vertex;
 
+  struct {
+    size_t count  = 0; // number of colors
+    size_t stride = 0; // stride between colors
+    size_t offset = 0; // an offset in bytes to the first vertex color
+    std::vector<Buffer*> buffers;
+  } color;
+
   TriangleGeom(TriangleGeomType* _geomType) : Geom() {
     geomType = (GeomType*)_geomType;
 
@@ -957,6 +964,20 @@ struct TriangleGeom : public Geom {
     vertex.count = count;
     vertex.stride = stride;
     vertex.offset = offset;
+  }
+
+  void setVertexColor(
+    Buffer* colors,
+    size_t count,
+    size_t stride,
+    size_t offset) 
+  {
+    // assuming no motion blurred triangles for now, so we assume 1 buffer
+    color.buffers.resize(1);
+    color.buffers[0] = colors;
+    color.count = count;
+    color.stride = stride;
+    color.offset = offset;
   }
 
   void setIndices(
@@ -3253,6 +3274,20 @@ GPRT_API void gprtTrianglesSetVertices(GPRTGeom _triangles,
   triangles->setVertices(vertices, count, stride, offset);
   LOG("Setting triangle vertices...");
 }
+
+GPRT_API void gprtTrianglesSetVertexColor(GPRTGeom _triangles,
+                                          GPRTBuffer _colors,
+                                          size_t count,
+                                          size_t stride,
+                                          size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *colors = (Buffer*)_colors;
+  triangles->setVertexColor(colors, count, stride, offset);
+  LOG("Setting triangle vertex color...");
+}
+
 // GPRT_API void gprtTrianglesSetMotionVertices(GPRTGeom triangles,
 //                                            /*! number of vertex arrays
 //                                                passed here, the first

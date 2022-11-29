@@ -32,8 +32,10 @@ struct TrianglesGeomData
   alignas(16) gprt::Buffer index; // vec3i*
   /*! array/buffer of vertex positions */
   alignas(16) gprt::Buffer vertex; // vec3f *  
-  /*! base color we use for the entire mesh */
-  alignas(16) float3 color;
+  // /*! base color we use for the entire mesh */
+  // alignas(16) float3 color;
+  /*! array/buffer of vertex positions */
+  alignas(16) gprt::Buffer color; // vec3f *  
 };
 
 struct RayGenData

@@ -96,6 +96,9 @@ ENDIF()
 # Find STB Image
 add_subdirectory(stb_image)
 
+# Find OBJ file loader
+add_subdirectory(tiny_obj_loader)
+
 # Find GLFW
 if(GPRT_BUILD_SAMPLES)
   find_package(glfw3 QUIET)

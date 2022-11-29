@@ -74,7 +74,9 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   float3 C      = gprt::load<float3>(record.vertex, index.z);
   float3 Ng     = normalize(cross(B-A,C-A));
   float3 rayDir = WorldRayDirection();
-  payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * record.color;
+  // payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * record.color;
+  // payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * float3(1.f, 1.f, 1.f);
+  payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * gprt::load<float3>(record.color, index.x);
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))

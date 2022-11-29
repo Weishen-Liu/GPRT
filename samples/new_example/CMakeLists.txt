@@ -30,10 +30,14 @@ embed_devicecode(
 )
 
 add_executable(new_example hostCode.cpp)
+target_include_directories(new_example PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(new_example PUBLIC ${CMAKE_CURRENT_LIST_DIR}/..)
 target_link_libraries(new_example
   PRIVATE
     new_example_deviceCode
     gprt::gprt
     glfw
+    tiny_obj_loader
+    stb_image
     ${OPENGL_gl_LIBRARY}
 )
