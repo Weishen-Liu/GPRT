@@ -1207,24 +1207,25 @@ gprtGeomTypeSetRasterAttachments(GPRTGeomTypeOf<T1> type, int rasterType, GPRTTe
  * @param pushConstantsSize The size of the push constants structure to upload to the device.
  * If 0, no push constants are updated. Currently limited to 128 bytes or less.
  * @param pushConstants A pointer to a structure of push constants to upload to the device.
-*/
+ */
 void gprtGeomTypeRasterize(GPRTContext context, GPRTGeomType geomType, uint32_t numGeometry, GPRTGeom *geometry,
-                           uint32_t rasterType, uint32_t *instanceCounts,
-                           size_t pushConstantsSize GPRT_IF_CPP(= 0),
-                            void *pushConstants GPRT_IF_CPP(= 0));
+                           uint32_t rasterType, uint32_t *instanceCounts, size_t pushConstantsSize GPRT_IF_CPP(= 0),
+                           void *pushConstants GPRT_IF_CPP(= 0));
 
 template <typename RecordType>
 void
-gprtGeomTypeRasterize(GPRTContext context, GPRTGeomTypeOf<RecordType> geomType, uint32_t numGeometry, GPRTGeomOf<RecordType> *geometry,
-                      uint32_t rayType, uint32_t *instanceCounts) {
+gprtGeomTypeRasterize(GPRTContext context, GPRTGeomTypeOf<RecordType> geomType, uint32_t numGeometry,
+                      GPRTGeomOf<RecordType> *geometry, uint32_t rayType, uint32_t *instanceCounts) {
   gprtGeomTypeRasterize(context, (GPRTGeomType) geomType, numGeometry, (GPRTGeom *) geometry, rayType, instanceCounts);
 }
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtGeomTypeRasterize(GPRTContext context, GPRTGeomTypeOf<RecordType> geomType, uint32_t numGeometry, GPRTGeomOf<RecordType> *geometry,
-                      uint32_t rayType, uint32_t *instanceCounts, PushConstantsType pc) {
-  gprtGeomTypeRasterize(context, (GPRTGeomType) geomType, numGeometry, (GPRTGeom *) geometry, rayType, instanceCounts, sizeof(PushConstantsType), &pc);
+gprtGeomTypeRasterize(GPRTContext context, GPRTGeomTypeOf<RecordType> geomType, uint32_t numGeometry,
+                      GPRTGeomOf<RecordType> *geometry, uint32_t rayType, uint32_t *instanceCounts,
+                      PushConstantsType pc) {
+  gprtGeomTypeRasterize(context, (GPRTGeomType) geomType, numGeometry, (GPRTGeom *) geometry, rayType, instanceCounts,
+                        sizeof(PushConstantsType), &pc);
 }
 
 /**
@@ -1732,7 +1733,8 @@ gprtRayGenLaunch1D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtRayGenLaunch1D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, PushConstantsType pushConstants) {
+gprtRayGenLaunch1D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x,
+                   PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
   gprtRayGenLaunch1D(context, (GPRTRayGen) rayGen, dims_x, sizeof(PushConstantsType), &pushConstants);
 }
@@ -1750,7 +1752,8 @@ gprtRayGenLaunch2D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtRayGenLaunch2D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y, PushConstantsType pushConstants) {
+gprtRayGenLaunch2D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y,
+                   PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
   gprtRayGenLaunch2D(context, (GPRTRayGen) rayGen, dims_x, dims_y, sizeof(PushConstantsType), &pushConstants);
 }
@@ -1762,20 +1765,21 @@ GPRT_API void gprtRayGenLaunch3D(GPRTContext context, GPRTRayGen rayGen, uint32_
 
 template <typename RecordType>
 void
-gprtRayGenLaunch3D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y, uint32_t dims_z) {
+gprtRayGenLaunch3D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y,
+                   uint32_t dims_z) {
   gprtRayGenLaunch3D(context, (GPRTRayGen) rayGen, dims_x, dims_y, dims_z);
 }
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtRayGenLaunch3D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y, uint32_t dims_z, PushConstantsType pushConstants) {
+gprtRayGenLaunch3D(GPRTContext context, GPRTRayGenOf<RecordType> rayGen, uint32_t dims_x, uint32_t dims_y,
+                   uint32_t dims_z, PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
   gprtRayGenLaunch3D(context, (GPRTRayGen) rayGen, dims_x, dims_y, dims_z, sizeof(PushConstantsType), &pushConstants);
 }
 
 GPRT_API void gprtComputeLaunch1D(GPRTContext context, GPRTCompute compute, uint32_t x_workgroups,
-                                  size_t pushConstantsSize GPRT_IF_CPP(= 0),
-                                  void *pushConstants GPRT_IF_CPP(= 0));
+                                  size_t pushConstantsSize GPRT_IF_CPP(= 0), void *pushConstants GPRT_IF_CPP(= 0));
 
 template <typename RecordType>
 void
@@ -1785,47 +1789,50 @@ gprtComputeLaunch1D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtComputeLaunch1D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups, PushConstantsType pushConstants) {
+gprtComputeLaunch1D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups,
+                    PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
   gprtComputeLaunch1D(context, (GPRTCompute) compute, x_workgroups, sizeof(PushConstantsType), &pushConstants);
 }
 
 GPRT_API void gprtComputeLaunch2D(GPRTContext context, GPRTCompute compute, uint32_t x_workgroups,
-                                  uint32_t y_workgroups,
-                                  size_t pushConstantsSize GPRT_IF_CPP(= 0),
+                                  uint32_t y_workgroups, size_t pushConstantsSize GPRT_IF_CPP(= 0),
                                   void *pushConstants GPRT_IF_CPP(= 0));
 
 template <typename RecordType>
 void
-gprtComputeLaunch2D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups, uint32_t y_workgroups) {
+gprtComputeLaunch2D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups,
+                    uint32_t y_workgroups) {
   gprtComputeLaunch2D(context, (GPRTCompute) compute, x_workgroups, y_workgroups);
 }
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtComputeLaunch2D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups, uint32_t y_workgroups, PushConstantsType pushConstants) {
+gprtComputeLaunch2D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups,
+                    uint32_t y_workgroups, PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
-  gprtComputeLaunch2D(context, (GPRTCompute) compute, x_workgroups, y_workgroups, sizeof(PushConstantsType), &pushConstants);
+  gprtComputeLaunch2D(context, (GPRTCompute) compute, x_workgroups, y_workgroups, sizeof(PushConstantsType),
+                      &pushConstants);
 }
 
 GPRT_API void gprtComputeLaunch3D(GPRTContext context, GPRTCompute compute, uint32_t x_workgroups,
                                   uint32_t y_workgroups, uint32_t z_workgroups,
-                                  size_t pushConstantsSize GPRT_IF_CPP(= 0),
-                                  void *pushConstants GPRT_IF_CPP(= 0));
+                                  size_t pushConstantsSize GPRT_IF_CPP(= 0), void *pushConstants GPRT_IF_CPP(= 0));
 
 template <typename RecordType>
 void
-gprtComputeLaunch3D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups, uint32_t y_workgroups,
-                    uint32_t z_workgroups) {
+gprtComputeLaunch3D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups,
+                    uint32_t y_workgroups, uint32_t z_workgroups) {
   gprtComputeLaunch3D(context, (GPRTCompute) compute, x_workgroups, y_workgroups, z_workgroups);
 }
 
 template <typename RecordType, typename PushConstantsType>
 void
-gprtComputeLaunch3D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups, uint32_t y_workgroups,
-                    uint32_t z_workgroups, PushConstantsType pushConstants) {
+gprtComputeLaunch3D(GPRTContext context, GPRTComputeOf<RecordType> compute, uint32_t x_workgroups,
+                    uint32_t y_workgroups, uint32_t z_workgroups, PushConstantsType pushConstants) {
   static_assert(sizeof(PushConstantsType) <= 128, "Current GPRT push constant size limited to 128 bytes or less");
-  gprtComputeLaunch3D(context, (GPRTCompute) compute, x_workgroups, y_workgroups, z_workgroups, sizeof(PushConstantsType), &pushConstants);
+  gprtComputeLaunch3D(context, (GPRTCompute) compute, x_workgroups, y_workgroups, z_workgroups,
+                      sizeof(PushConstantsType), &pushConstants);
 }
 
 GPRT_API void gprtBeginProfile(GPRTContext context);

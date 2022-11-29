@@ -23,14 +23,23 @@
 // This program sets up a single geometric object, a mesh for a cube, and
 // its acceleration structure, then ray traces it.
 
+#ifndef   INCLUDE_GPRT
+#define   INCLUDE_GPRT
 // public GPRT API
 #include <gprt.h>
+#endif
 
+#ifndef   INCLUDE_DEVICE_CODE
+#define   INCLUDE_DEVICE_CODE
 // our device-side data structures
 #include "deviceCode.h"
+#endif
 
+#ifndef   INCLUDE_GLFW
+#define   INCLUDE_GLFW
 // library for windowing
 #include <GLFW/glfw3.h>
+#endif
 
 #define LOG(message)                                            \
   std::cout << GPRT_TERMINAL_BLUE;                               \
@@ -41,7 +50,14 @@
   std::cout << "#gprt.sample(main): " << message << std::endl;   \
   std::cout << GPRT_TERMINAL_DEFAULT;
 
+#include "loadModel.hpp"
+#include "loadTexture.hpp"
+
+
 extern GPRTProgram new_example_deviceCode;
+
+const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
+const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
 const int NUM_VERTICES = 8;
 float3 vertices[NUM_VERTICES] =
@@ -66,6 +82,10 @@ int3 indices[NUM_INDICES] =
     { 1,5,7 }, { 1,7,3 },
     { 4,0,2 }, { 4,2,6 }
   };
+
+std::vector<float3> list_of_vertices;
+std::vector<int3> list_of_indices;
+std::vector<float3> list_of_colors;
 
 float transform[3][4] =
   {
@@ -102,7 +122,8 @@ int main(int ac, char **av)
   GPRTVarDecl trianglesGeomVars[] = {
     { "index",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,index)},
     { "vertex", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,vertex)},
-    { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
+    // { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
+    { "color",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,color)},
     { /* sentinel to mark end of list */ }
   };
   GPRTGeomType trianglesGeomType
@@ -122,10 +143,20 @@ int main(int ac, char **av)
   // ------------------------------------------------------------------
   // triangle mesh
   // ------------------------------------------------------------------
+
+  // GPRTBuffer vertexBuffer
+  //   = gprtHostBufferCreate(context,GPRT_FLOAT3,NUM_VERTICES,vertices);
+  // GPRTBuffer indexBuffer
+  //   = gprtDeviceBufferCreate(context,GPRT_INT3,NUM_INDICES,indices);
+  loadModel(MODEL_PATH, list_of_vertices, list_of_indices, list_of_colors);
+  loadTexture(TEXTURE_PATH);
   GPRTBuffer vertexBuffer
-    = gprtHostBufferCreate(context,GPRT_FLOAT3,NUM_VERTICES,vertices);
+    = gprtHostBufferCreate(context,GPRT_FLOAT3,list_of_vertices.size(),static_cast<const void*>(list_of_vertices.data()));
   GPRTBuffer indexBuffer
-    = gprtDeviceBufferCreate(context,GPRT_INT3,NUM_INDICES,indices);
+    = gprtDeviceBufferCreate(context,GPRT_INT3,list_of_indices.size(),static_cast<const void*>(list_of_indices.data()));
+  GPRTBuffer colorBuffer
+    = gprtDeviceBufferCreate(context,GPRT_FLOAT3,list_of_colors.size(),static_cast<const void*>(list_of_colors.data()));
+
   GPRTBuffer transformBuffer
     = gprtDeviceBufferCreate(context,GPRT_TRANSFORM,1,transform);
   GPRTBuffer frameBuffer
@@ -135,13 +166,16 @@ int main(int ac, char **av)
     = gprtGeomCreate(context,trianglesGeomType);
 
   gprtTrianglesSetVertices(trianglesGeom,vertexBuffer,
-                           NUM_VERTICES,sizeof(float3),0);
+                           list_of_vertices.size(),sizeof(float3),0);
   gprtTrianglesSetIndices(trianglesGeom,indexBuffer,
-                          NUM_INDICES,sizeof(int3),0);
+                          list_of_indices.size(),sizeof(int3),0);
+  gprtTrianglesSetVertexColor(trianglesGeom,colorBuffer,
+                           list_of_colors.size(),sizeof(float3),0);
 
   gprtGeomSetBuffer(trianglesGeom,"vertex",vertexBuffer);
   gprtGeomSetBuffer(trianglesGeom,"index",indexBuffer);
-  gprtGeomSet3f(trianglesGeom,"color",0,1,0);
+  // gprtGeomSet3f(trianglesGeom,"color",0,1,0);
+  gprtGeomSetBuffer(trianglesGeom,"color",colorBuffer);
 
   // ------------------------------------------------------------------
   // the group/accel for that mesh
@@ -358,6 +392,7 @@ int main(int ac, char **av)
 
   gprtBufferDestroy(vertexBuffer);
   gprtBufferDestroy(indexBuffer);
+  gprtBufferDestroy(colorBuffer);
   gprtBufferDestroy(frameBuffer);
   gprtBufferDestroy(transformBuffer);
   gprtRayGenDestroy(rayGen);
