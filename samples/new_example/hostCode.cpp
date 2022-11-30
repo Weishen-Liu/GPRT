@@ -86,6 +86,7 @@ int3 indices[NUM_INDICES] =
 std::vector<float3> list_of_vertices;
 std::vector<int3> list_of_indices;
 std::vector<float3> list_of_colors;
+std::vector<float3> list_of_vertex_normals;
 
 float transform[3][4] =
   {
@@ -124,6 +125,7 @@ int main(int ac, char **av)
     { "vertex", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,vertex)},
     // { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
     { "color",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,color)},
+    { "normal",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,normal)},
     { /* sentinel to mark end of list */ }
   };
   GPRTGeomType trianglesGeomType
@@ -148,10 +150,12 @@ int main(int ac, char **av)
   //   = gprtHostBufferCreate(context,GPRT_FLOAT3,NUM_VERTICES,vertices);
   // GPRTBuffer indexBuffer
   //   = gprtDeviceBufferCreate(context,GPRT_INT3,NUM_INDICES,indices);
-  loadModel(MODEL_PATH, list_of_vertices, list_of_indices, list_of_colors);
-  loadTexture(TEXTURE_PATH);
+  loadModel(MODEL_PATH, list_of_vertices, list_of_indices, list_of_colors, list_of_vertex_normals);
+  // loadTexture(TEXTURE_PATH);
   GPRTBuffer vertexBuffer
     = gprtHostBufferCreate(context,GPRT_FLOAT3,list_of_vertices.size(),static_cast<const void*>(list_of_vertices.data()));
+  GPRTBuffer normalBuffer
+    = gprtDeviceBufferCreate(context,GPRT_FLOAT3,list_of_vertex_normals.size(),static_cast<const void*>(list_of_vertex_normals.data()));
   GPRTBuffer indexBuffer
     = gprtDeviceBufferCreate(context,GPRT_INT3,list_of_indices.size(),static_cast<const void*>(list_of_indices.data()));
   GPRTBuffer colorBuffer
@@ -167,12 +171,15 @@ int main(int ac, char **av)
 
   gprtTrianglesSetVertices(trianglesGeom,vertexBuffer,
                            list_of_vertices.size(),sizeof(float3),0);
+  gprtTrianglesSetVertexNormal(trianglesGeom,normalBuffer,
+                           list_of_vertex_normals.size(),sizeof(float3),0);
   gprtTrianglesSetIndices(trianglesGeom,indexBuffer,
                           list_of_indices.size(),sizeof(int3),0);
   gprtTrianglesSetVertexColor(trianglesGeom,colorBuffer,
                            list_of_colors.size(),sizeof(float3),0);
 
   gprtGeomSetBuffer(trianglesGeom,"vertex",vertexBuffer);
+  gprtGeomSetBuffer(trianglesGeom,"normal",normalBuffer);
   gprtGeomSetBuffer(trianglesGeom,"index",indexBuffer);
   // gprtGeomSet3f(trianglesGeom,"color",0,1,0);
   gprtGeomSetBuffer(trianglesGeom,"color",colorBuffer);

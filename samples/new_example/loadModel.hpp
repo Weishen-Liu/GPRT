@@ -22,6 +22,7 @@
 struct Vertex
 {
     float3 pos;
+    float3 normal;
     float3 color;
     float2 texCoord;
 
@@ -72,7 +73,8 @@ namespace std {
 void loadModel(const std::string MODEL_PATH,
                std::vector<float3>& list_of_vertices,
                std::vector<int3>& list_of_indices,
-               std::vector<float3>& list_of_colors)
+               std::vector<float3>& list_of_colors,
+               std::vector<float3>&list_of_vertex_normals)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -95,10 +97,16 @@ void loadModel(const std::string MODEL_PATH,
                 attrib.vertices[3 * index.vertex_index + 2]
             };
 
-            vertex.texCoord = {
-                attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            vertex.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2]
             };
+
+            // vertex.texCoord = {
+            //     attrib.texcoords[2 * index.texcoord_index + 0],
+            //     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            // };
 
             vertex.color = {1.0f, 1.0f, 1.0f};
 
@@ -106,6 +114,7 @@ void loadModel(const std::string MODEL_PATH,
                 uniqueVertices[vertex] = static_cast<uint32_t>(list_of_vertices.size());
                 list_of_vertices.push_back(vertex.pos);
                 list_of_colors.push_back(vertex.color);
+                list_of_vertex_normals.push_back(vertex.normal);
             }
 
             indices.push_back(uniqueVertices[vertex]);

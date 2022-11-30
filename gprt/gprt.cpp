@@ -2529,6 +2529,13 @@ struct TriangleGeom : public Geom {
     std::vector<Buffer *> buffers;
   } vertex;
 
+  struct {
+    size_t count  = 0; // number of vertices
+    size_t stride = 0; // stride between vertices
+    size_t offset = 0; // an offset in bytes to the first vertex
+    std::vector<Buffer*> buffers;
+  } normal;
+
   TriangleGeom(TriangleGeomType *_geomType) : Geom() {
     geomType = (GeomType *) _geomType;
 
@@ -2545,6 +2552,20 @@ struct TriangleGeom : public Geom {
     vertex.count = count;
     vertex.stride = stride;
     vertex.offset = offset;
+  }
+
+  void setVertexNormal(
+    Buffer* normals,
+    size_t count,
+    size_t stride,
+    size_t offset) 
+  {
+    // assuming no motion blurred triangles for now, so we assume 1 buffer
+    normal.buffers.resize(1);
+    normal.buffers[0] = normals;
+    normal.count = count;
+    normal.stride = stride;
+    normal.offset = offset;
   }
 
   void setIndices(Buffer *indices, uint32_t count, uint32_t stride, uint32_t offset) {
@@ -7372,547 +7393,913 @@ struct Context {
     computePipelineCreateInfo.stage = shaderStage;
 
     // At this point, create all internal compute pipelines as well.
-    err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                   &fillInstanceDataStage.pipeline);
+    err = vkCreateComputePipelines(logicalDevice, 
+      cache, 1, &computePipelineCreateInfo, nullptr, &fillInstanceDataStage.pipeline);
+    //todo, destroy the above stuff
+  }
+};
+
+
+GPRT_API GPRTContext gprtContextCreate(int32_t *requestedDeviceIDs,
+                                    int      numRequestedDevices)
+{
+  LOG_API_CALL();
+  Context *context = new Context(requestedDeviceIDs, numRequestedDevices);
+  LOG("context created...");
+  return (GPRTContext)context;
+}
+
+GPRT_API void gprtContextDestroy(GPRTContext _context)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  context->destroy();
+  delete context;
+  LOG("context destroyed...");
+}
+
+GPRT_API void
+gprtContextSetRayTypeCount(GPRTContext _context,
+                           size_t numRayTypes)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  context->numRayTypes = numRayTypes;
+}
+
+GPRT_API size_t
+gprtContextGetRayTypeCount(GPRTContext _context)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  return context->numRayTypes;
+}
+
+GPRT_API GPRTModule gprtModuleCreate(GPRTContext _context, GPRTProgram spvCode)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  Module *module = new Module(spvCode);
+  LOG("module created...");
+  return (GPRTModule)module;
+}
+
+GPRT_API void gprtModuleDestroy(GPRTModule _module)
+{
+  LOG_API_CALL();
+  Module *module = (Module*)_module;
+  delete module;
+  LOG("module destroyed...");
+}
+
+GPRT_API GPRTGeom
+gprtGeomCreate(GPRTContext  _context,
+              GPRTGeomType _geomType)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  GeomType *geomType = (GeomType*)_geomType;
+
+  // depending on what the geomType is, we'll use this inherited "createGeom"
+  // function to construct the appropriate geometry
+  Geom *geometry = geomType->createGeom();
+  return (GPRTGeom)geometry;
+  LOG("geometry created...");
+}
+
+GPRT_API void 
+gprtGeomDestroy(GPRTGeom _geometry)
+{
+  LOG_API_CALL();
+  Geom *geometry = (Geom*)_geometry;
+  geometry->destroy();
+  delete geometry;
+  LOG("geometry destroyed...");
+}
+
+// ==================================================================
+// "Triangles" functions
+// ==================================================================
+GPRT_API void gprtTrianglesSetVertices(GPRTGeom _triangles,
+                                      GPRTBuffer _vertices,
+                                      size_t count,
+                                      size_t stride,
+                                      size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *vertices = (Buffer*)_vertices;
+  triangles->setVertices(vertices, count, stride, offset);
+  LOG("Setting triangle vertices...");
+}
+
+GPRT_API void gprtTrianglesSetVertexColor(GPRTGeom _triangles,
+                                          GPRTBuffer _colors,
+                                          size_t count,
+                                          size_t stride,
+                                          size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *colors = (Buffer*)_colors;
+  triangles->setVertexColor(colors, count, stride, offset);
+  LOG("Setting triangle vertex color...");
+}
+
+// GPRT_API void gprtTrianglesSetMotionVertices(GPRTGeom triangles,
+//                                            /*! number of vertex arrays
+//                                                passed here, the first
+//                                                of those is for t=0,
+//                                                thelast for t=1,
+//                                                everything is linearly
+//                                                interpolated
+//                                                in-between */
+//                                            size_t    numKeys,
+//                                            GPRTBuffer *vertexArrays,
+//                                            size_t count,
+//                                            size_t stride,
+//                                            size_t offset)
+// {
+//   GPRT_NOTIMPLEMENTED;
+// }
+
+GPRT_API void gprtTrianglesSetIndices(GPRTGeom _triangles,
+                                     GPRTBuffer _indices,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *indices = (Buffer*)_indices;
+  triangles->setIndices(indices, count, stride, offset);
+  LOG("Setting triangle indices...");
+}
+
+void gprtAABBsSetPositions(GPRTGeom _aabbs, 
+                           GPRTBuffer _positions,
+                           size_t count,
+                           size_t stride,
+                           size_t offset)
+{
+  LOG_API_CALL();
+  AABBGeom *aabbs = (AABBGeom*)_aabbs;
+  Buffer *positions = (Buffer*)_positions;
+  aabbs->setAABBs(positions, count, stride, offset);
+  LOG("Setting AABB positions...");
+}
+
+GPRT_API GPRTRayGen
+gprtRayGenCreate(GPRTContext _context,
+                 GPRTModule  _module,
+                 const char  *programName,
+                 size_t       sizeOfVarStruct,
+                 GPRTVarDecl *vars,
+                 int          numVars)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  Module *module = (Module*)_module;
+
+  RayGen *raygen = new RayGen(
+    context->logicalDevice, module, programName,
+    sizeOfVarStruct, checkAndPackVariables(vars, numVars));
+
+  context->raygenPrograms.push_back(raygen);
+
+  LOG("raygen created...");
+  return (GPRTRayGen)raygen;
+}
+
+GPRT_API void
+gprtRayGenDestroy(GPRTRayGen _rayGen)
+{
+  LOG_API_CALL();
+  RayGen *rayGen = (RayGen*)_rayGen;
+  rayGen->destroy();
+  delete rayGen;
+  LOG("raygen destroyed...");
+}
+
+GPRT_API GPRTCompute
+gprtComputeCreate(GPRTContext _context,
+                 GPRTModule  _module,
+                 const char  *programName,
+                 size_t       sizeOfVarStruct,
+                 GPRTVarDecl *vars,
+                 int          numVars)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  Module *module = (Module*)_module;
+
+  Compute *compute = new Compute(
+    context->logicalDevice, module, programName,
+    sizeOfVarStruct, checkAndPackVariables(vars, numVars));
+
+  context->computePrograms.push_back(compute);
+
+  LOG("compute created...");
+  return (GPRTCompute)compute;
+}
+
+GPRT_API void
+gprtComputeDestroy(GPRTCompute _compute)
+{
+  LOG_API_CALL();
+  Compute *compute = (Compute*)_compute;
+  compute->destroy();
+  delete compute;
+  LOG("compute destroyed...");
+}
+
+GPRT_API GPRTMiss
+gprtMissCreate(GPRTContext _context,
+                   GPRTModule  _module,
+                   const char  *programName,
+                   size_t       sizeOfVarStruct,
+                   GPRTVarDecl *vars,
+                   int          numVars)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  Module *module = (Module*)_module;
+
+  Miss *missProg = new Miss(
+    context->logicalDevice, module, programName,
+    sizeOfVarStruct, checkAndPackVariables(vars, numVars));
+
+  context->missPrograms.push_back(missProg);
+
+  LOG("miss program created...");
+  return (GPRTMiss)missProg;
+}
+
+
+/*! sets the given miss program for the given ray type */
+GPRT_API void
+gprtMissSet(GPRTContext  _context,
+               int rayType,
+               GPRTMiss _missToUse)
+{
+  GPRT_NOTIMPLEMENTED;
+}
+
+GPRT_API void
+gprtMissDestroy(GPRTMiss _miss)
+{
+  LOG_API_CALL();
+  Miss *missProg = (Miss*)_miss;
+  missProg->destroy();
+  delete missProg;
+  LOG("miss program destroyed...");
+}
+
+GPRT_API GPRTGeomType
+gprtGeomTypeCreate(GPRTContext  _context,
+                   GPRTGeomKind kind,
+                   size_t       sizeOfVarStruct,
+                   GPRTVarDecl  *vars,
+                   int          numVars)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+
+  GeomType *geomType = nullptr;
+
+  switch(kind) {
+    case GPRT_TRIANGLES:
+      geomType = new TriangleGeomType(
+        context->logicalDevice, context->numRayTypes,
+        sizeOfVarStruct, checkAndPackVariables(vars, numVars));
+        break;
+    case GPRT_AABBS:
+      geomType = new AABBGeomType(
+        context->logicalDevice, context->numRayTypes,
+        sizeOfVarStruct, checkAndPackVariables(vars, numVars));
+        break;
+    default:
+      GPRT_NOTIMPLEMENTED;
+      break;
   }
 
-  void setupSortStages(Module *module) {
-    // currently not using cache.
-    VkPipelineCache cache = VK_NULL_HANDLE;
+  context->geomTypes.push_back(geomType);
 
-    VkDescriptorPoolSize poolSize;
-    poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSize.descriptorCount = 16;
+  LOG("geom type created...");
+  return (GPRTGeomType)geomType;
+}
 
-    VkDescriptorPoolCreateInfo descriptorPoolInfo{};
-    descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolInfo.poolSizeCount = 1;
-    descriptorPoolInfo.pPoolSizes = &poolSize;
-    descriptorPoolInfo.maxSets = 5;
-    descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    VK_CHECK_RESULT(vkCreateDescriptorPool(logicalDevice, &descriptorPoolInfo, nullptr, &sortStages.pool));
+GPRT_API void 
+gprtGeomTypeDestroy(GPRTGeomType _geomType)
+{
+  LOG_API_CALL();
+  GeomType *geomType = (GeomType*)_geomType;
+  geomType->destroy();
+  delete geomType;
+  LOG("geom type destroyed...");
+}
 
-    sortStages.Count.entryPoint = "Count";
-    sortStages.CountReduce.entryPoint = "CountReduce";
-    sortStages.Scan.entryPoint = "Scan";
-    sortStages.ScanAdd.entryPoint = "ScanAdd";
-    sortStages.Scatter.entryPoint = "Scatter";
-    sortStages.ScatterPayload.entryPoint = "ScatterPayload";
+GPRT_API void
+gprtGeomTypeSetClosestHitProg(GPRTGeomType _geomType,
+                          int rayType,
+                          GPRTModule _module,
+                          const char *progName)
+{
+  LOG_API_CALL();
+  GeomType *geomType = (GeomType*)_geomType;
+  Module *module = (Module*)_module;
 
-    // Create binding for Radix sort passes
-    VkDescriptorSetLayoutBinding layout_bindings_set_InputOutputs[] = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // SrcBuffer (sort)
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // DstBuffer (sort)
-        {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // ScrPayload (sort only)
-        {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // DstPayload (sort only)
-    };
+  geomType->setClosestHit(rayType, module, progName);
+  LOG("assigning closest hit program to geom type...");
+}
 
-    VkDescriptorSetLayoutBinding layout_bindings_set_Scan[] = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // ScanSrc
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // ScanDst
-        {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // ScanScratch
-    };
+GPRT_API void
+gprtGeomTypeSetAnyHitProg(GPRTGeomType _geomType,
+                          int rayType,
+                          GPRTModule _module,
+                          const char *progName)
+{
+  LOG_API_CALL();
+  GeomType *geomType = (GeomType*)_geomType;
+  Module *module = (Module*)_module;
 
-    VkDescriptorSetLayoutBinding layout_bindings_set_Scratch[] = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // Scratch (sort only)
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},   // Scratch (reduced)
-    };
+  geomType->setAnyHit(rayType, module, progName);
+  LOG("assigning any hit program to geom type...");
+}
 
-    auto AllocDescriptor = [&](VkDescriptorPool pool, VkDescriptorSetLayout layout, VkDescriptorSet *descriptorSet) {
-      VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-      descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-      descriptorSetAllocateInfo.descriptorPool = pool;
-      descriptorSetAllocateInfo.pSetLayouts = &layout;
-      descriptorSetAllocateInfo.descriptorSetCount = 1;
-      descriptorSetAllocateInfo.pNext = nullptr;
-      VkResult err = vkAllocateDescriptorSets(logicalDevice, &descriptorSetAllocateInfo, descriptorSet);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to allocate descriptor! \n" + errorString(err));
-      }
-    };
+GPRT_API void
+gprtGeomTypeSetIntersectionProg(GPRTGeomType _geomType,
+                          int rayType,
+                          GPRTModule _module,
+                          const char *progName)
+{
+  LOG_API_CALL();
+  GeomType *geomType = (GeomType*)_geomType;
+  Module *module = (Module*)_module;
 
-    VkResult vkResult;
+  geomType->setIntersection(rayType, module, progName);
+  LOG("assigning intersect program to geom type...");
+}
 
-    VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    descriptor_set_layout_create_info.pNext = nullptr;
-    descriptor_set_layout_create_info.flags = 0;
-    descriptor_set_layout_create_info.pBindings = layout_bindings_set_InputOutputs;
-    descriptor_set_layout_create_info.bindingCount = 4;
-    vkResult = vkCreateDescriptorSetLayout(logicalDevice, &descriptor_set_layout_create_info, nullptr,
-                                           &sortStages.m_SortDescriptorSetLayoutInputOutputs);
-    VK_CHECK_RESULT(vkResult);
-    AllocDescriptor(sortStages.pool, sortStages.m_SortDescriptorSetLayoutInputOutputs,
-                    &sortStages.m_SortDescriptorSetInputOutput[0]);
-    AllocDescriptor(sortStages.pool, sortStages.m_SortDescriptorSetLayoutInputOutputs,
-                    &sortStages.m_SortDescriptorSetInputOutput[1]);
+GPRT_API GPRTBuffer
+gprtHostBufferCreate(GPRTContext _context, GPRTDataType type, size_t count, const void* init)
+{
+  LOG_API_CALL();
+  const VkBufferUsageFlags bufferUsageFlags =
+    // means we can get this buffer's address with vkGetBufferDeviceAddress
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+    // I guess I need this to use these buffers as input to tree builds?
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | 
+    // means we can use this buffer to transfer into another
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    // means we can use this buffer to receive data transferred from another
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT
+  ;
+  const VkMemoryPropertyFlags memoryUsageFlags =
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | // mappable to host with vkMapMemory
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // means "flush" and "invalidate"  not needed
 
-    descriptor_set_layout_create_info.pBindings = layout_bindings_set_Scan;
-    descriptor_set_layout_create_info.bindingCount = 3;
-    vkResult = vkCreateDescriptorSetLayout(logicalDevice, &descriptor_set_layout_create_info, nullptr,
-                                           &sortStages.m_SortDescriptorSetLayoutScan);
-    VK_CHECK_RESULT(vkResult);
-    AllocDescriptor(sortStages.pool, sortStages.m_SortDescriptorSetLayoutScan,
-                    &sortStages.m_SortDescriptorSetScanSets[0]);
-    AllocDescriptor(sortStages.pool, sortStages.m_SortDescriptorSetLayoutScan,
-                    &sortStages.m_SortDescriptorSetScanSets[1]);
+  Context *context = (Context*)_context;
+  Buffer *buffer = new Buffer(
+    context->physicalDevice, context->logicalDevice, 
+    context->graphicsCommandBuffer, context->graphicsQueue,
+    bufferUsageFlags, memoryUsageFlags,
+    getSize(type) * count
+  );
 
-    descriptor_set_layout_create_info.pBindings = layout_bindings_set_Scratch;
-    descriptor_set_layout_create_info.bindingCount = 2;
-    vkResult = vkCreateDescriptorSetLayout(logicalDevice, &descriptor_set_layout_create_info, nullptr,
-                                           &sortStages.m_SortDescriptorSetLayoutScratch);
-    VK_CHECK_RESULT(vkResult);
-    AllocDescriptor(sortStages.pool, sortStages.m_SortDescriptorSetLayoutScratch,
-                    &sortStages.m_SortDescriptorSetScratch);
+  // Pin the buffer to the host
+  buffer->map();
+  
+  if (init) {
+    void* mapped = buffer->mapped;
+    memcpy(mapped, init, getSize(type) * count);
+    buffer->flush();
+    buffer->invalidate();
+  }
+  LOG("buffer created");
+  return (GPRTBuffer)buffer;
+}
 
-    // Create constant range representing our static constant
-    VkPushConstantRange constant_range;
-    constant_range.stageFlags = VK_SHADER_STAGE_ALL;
-    constant_range.offset = 0;
-    constant_range.size = sizeof(ParallelSortCB);
+GPRT_API GPRTBuffer
+gprtDeviceBufferCreate(GPRTContext _context, GPRTDataType type, size_t count, const void* init)
+{
+  LOG_API_CALL();
+  const VkBufferUsageFlags bufferUsageFlags =
+    // means we can get this buffer's address with vkGetBufferDeviceAddress
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+    // I guess I need this to use these buffers as input to tree builds?
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | 
+    // means we can use this buffer to transfer into another
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    // means we can use this buffer to receive data transferred from another
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  const VkMemoryPropertyFlags memoryUsageFlags =
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; // means most efficient for device access
 
-    // Create the pipeline layout (Root signature)
-    VkPipelineLayoutCreateInfo layout_create_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    layout_create_info.pNext = nullptr;
-    layout_create_info.flags = 0;
-    layout_create_info.setLayoutCount = 3;
-    VkDescriptorSetLayout layouts[] = {sortStages.m_SortDescriptorSetLayoutInputOutputs,
-                                       sortStages.m_SortDescriptorSetLayoutScan,
-                                       sortStages.m_SortDescriptorSetLayoutScratch};
-    layout_create_info.pSetLayouts = layouts;
-    layout_create_info.pushConstantRangeCount = 1;
-    layout_create_info.pPushConstantRanges = &constant_range;
+  Context *context = (Context*)_context;
+  Buffer *buffer = new Buffer(
+    context->physicalDevice, context->logicalDevice,
+    context->graphicsCommandBuffer, context->graphicsQueue,
+    bufferUsageFlags, memoryUsageFlags,
+    getSize(type) * count
+  );
+  
+  if (init) {    
+    buffer->map();
+    void* mapped = buffer->mapped;
+    memcpy(mapped, init, getSize(type) * count);
+    buffer->unmap();
+  }
+  LOG("buffer created");
+  return (GPRTBuffer)buffer;
+}
 
-    VkResult bCreatePipelineLayout =
-        vkCreatePipelineLayout(logicalDevice, &layout_create_info, nullptr, &sortStages.layout);
-    assert(bCreatePipelineLayout == VK_SUCCESS);
+GPRT_API GPRTBuffer
+gprtSharedBufferCreate(GPRTContext _context, GPRTDataType type, size_t count, const void* init)
+{
+  LOG_API_CALL();
+  const VkBufferUsageFlags bufferUsageFlags =
+    // means we can get this buffer's address with vkGetBufferDeviceAddress
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+    // I guess I need this to use these buffers as input to tree builds?
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | 
+    // means we can use this buffer to transfer into another
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    // means we can use this buffer to receive data transferred from another
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT
+  ;
+  const VkMemoryPropertyFlags memoryUsageFlags =
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | // mappable to host with vkMapMemory
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |  // means "flush" and "invalidate"  not needed
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; // means most efficient for device access
 
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.Count.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
+  Context *context = (Context*)_context;
+  Buffer *buffer = new Buffer(
+    context->physicalDevice, context->logicalDevice, 
+    context->graphicsCommandBuffer, context->graphicsQueue,
+    bufferUsageFlags, memoryUsageFlags,
+    getSize(type) * count
+  );
 
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
+  // Pin the buffer to the host
+  buffer->map();
+  
+  if (init) {
+    void* mapped = buffer->mapped;
+    memcpy(mapped, init, getSize(type) * count);
+    buffer->flush();
+    buffer->invalidate();
+  }
+  LOG("buffer created");
+  return (GPRTBuffer)buffer;
+}
 
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.Count.module);
+GPRT_API void
+gprtBufferDestroy(GPRTBuffer _buffer)
+{
+  LOG_API_CALL();
+  Buffer *buffer = (Buffer*)_buffer;
+  buffer->destroy();
+  delete buffer;
+  LOG("buffer destroyed");
+}
 
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.Count.module;
-      shaderStage.pName = entryPoint.c_str();
+GPRT_API void *
+gprtBufferGetPointer(GPRTBuffer _buffer, int deviceID)
+{
+  LOG_API_CALL();
+  Buffer *buffer = (Buffer*)_buffer;
+  return buffer->mapped;
+}
 
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
+GPRT_API void
+gprtBufferMap(GPRTBuffer _buffer, int deviceID)
+{
+  LOG_API_CALL();
+  Buffer *buffer = (Buffer*)_buffer;
+  buffer->map();
+}
 
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.Count.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
+GPRT_API void
+gprtBufferUnmap(GPRTBuffer _buffer, int deviceID)
+{
+  LOG_API_CALL();
+  Buffer *buffer = (Buffer*)_buffer;
+  buffer->unmap();
+}
 
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.CountReduce.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
 
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
 
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.CountReduce.module);
+GPRT_API void gprtBuildPipeline(GPRTContext _context)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  context->buildPipeline();
+  LOG("programs built...");
+}
 
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.CountReduce.module;
-      shaderStage.pName = entryPoint.c_str();
+GPRT_API GPRTAccel
+gprtAABBAccelCreate(GPRTContext _context,
+                       size_t       numGeometries,
+                       GPRTGeom    *arrayOfChildGeoms,
+                       unsigned int flags)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  AABBAccel *accel = new 
+    AABBAccel(
+      context->physicalDevice, context->logicalDevice, 
+      context->graphicsCommandBuffer, context->graphicsQueue, 
+      numGeometries, (AABBGeom*)arrayOfChildGeoms);
+  context->accels.push_back(accel);
+  return (GPRTAccel)accel;
+}
 
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
+GPRT_API GPRTAccel
+gprtTrianglesAccelCreate(GPRTContext _context,
+                            size_t     numGeometries,
+                            GPRTGeom   *arrayOfChildGeoms,
+                            unsigned int flags)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  TriangleAccel *accel = new 
+    TriangleAccel(
+      context->physicalDevice, context->logicalDevice, 
+      context->graphicsCommandBuffer, context->graphicsQueue, 
+      numGeometries, (TriangleGeom*)arrayOfChildGeoms);
+  context->accels.push_back(accel);
+  return (GPRTAccel)accel;
+}
 
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.CountReduce.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
+GPRT_API GPRTAccel
+gprtCurvesAccelCreate(GPRTContext context,
+                         size_t     numCurveGeometries,
+                         GPRTGeom   *curveGeometries,
+                         unsigned int flags)
+{
+  GPRT_NOTIMPLEMENTED;
+  return nullptr;
+}
 
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.Scan.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
+GPRT_API GPRTAccel
+gprtInstanceAccelCreate(GPRTContext _context,
+                        size_t numAccels,
+                        GPRTAccel *arrayOfAccels,
+                        unsigned int flags)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  InstanceAccel *accel = new 
+    InstanceAccel(
+      context->physicalDevice, context->logicalDevice, 
+      context->graphicsCommandBuffer, context->graphicsQueue, 
+      numAccels, arrayOfAccels);
+  context->accels.push_back(accel);
+  return (GPRTAccel)accel;
+}
 
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
+GPRT_API void 
+gprtInstanceAccelSet3x4Transforms(GPRTAccel instanceAccel,
+                                  GPRTBuffer transforms)
+{
+  gprtInstanceAccelSetTransforms(instanceAccel, transforms, sizeof(float3x4), 0);
+}
 
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.Scan.module);
+GPRT_API void 
+gprtInstanceAccelSet4x4Transforms(GPRTAccel instanceAccel,
+                                  GPRTBuffer transforms)
+{
+  gprtInstanceAccelSetTransforms(instanceAccel, transforms, sizeof(float4x4), 0);
+}
 
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.Scan.module;
-      shaderStage.pName = entryPoint.c_str();
+GPRT_API void 
+gprtInstanceAccelSetTransforms(GPRTAccel instanceAccel,
+                               GPRTBuffer _transforms,
+                               size_t stride,
+                               size_t offset
+                               )
+{
+  LOG_API_CALL();
+  InstanceAccel *accel = (InstanceAccel*)instanceAccel;
+  Buffer *transforms = (Buffer*)_transforms;
+  accel->setTransforms(transforms, stride, offset);
+  LOG("Setting instance accel transforms...");
+}
 
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
+GPRT_API void 
+gprtInstanceAccelSetReferences(GPRTAccel instanceAccel,
+                               GPRTBuffer _references//,
+                               // size_t offset, // maybe I can support these too?
+                               // size_t stride  // maybe I can support these too?
+                               )
+{
+  LOG_API_CALL();
+  InstanceAccel *accel = (InstanceAccel*)instanceAccel;
+  Buffer *references = (Buffer*)_references;
+  accel->setReferences(references);
+  LOG("Setting instance accel references...");
+}
 
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.Scan.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
+GPRT_API void 
+gprtInstanceAccelSetNumGeometries(GPRTAccel instanceAccel, 
+                                  size_t numGeometries)
+{
+  LOG_API_CALL();
+  InstanceAccel *accel = (InstanceAccel*)instanceAccel;
+  accel->setNumGeometries(numGeometries);
+  LOG("Setting instance accel references...");
+}
 
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.ScanAdd.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
+GPRT_API void
+gprtAccelDestroy(GPRTAccel _accel)
+{
+  LOG_API_CALL();
+  Accel *accel = (Accel*)_accel;
+  accel->destroy();
+  delete accel;
+  LOG("accel destroyed");
+}
 
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
+GPRT_API void gprtAccelBuild(GPRTContext _context, GPRTAccel _accel)
+{
+  Accel *accel = (Accel*)_accel;
+  Context *context = (Context*)_context;
+  accel->build({
+    {"gprtFillInstanceData", context->fillInstanceDataStage}},
+    context->accels, context->numRayTypes
+  );
+}
 
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.ScanAdd.module);
+GPRT_API void gprtAccelRefit(GPRTContext _context, GPRTAccel accel)
+{
+  GPRT_NOTIMPLEMENTED;
+}
 
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.ScanAdd.module;
-      shaderStage.pName = entryPoint.c_str();
+GPRT_API uint64_t gprtAccelGetReference(GPRTAccel _accel)
+{
+  Accel *accel = (Accel*)_accel;
+  return uint64_t(accel->address);
+}
 
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
+GPRT_API void gprtBuildShaderBindingTable(GPRTContext _context,
+                           GPRTBuildSBTFlags flags)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  context->buildSBT();
+}
 
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.ScanAdd.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
+GPRT_API void
+gprtRayGenLaunch1D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x)
+{
+  LOG_API_CALL();
+  gprtRayGenLaunch2D(_context, _rayGen,dims_x,1);
+}
 
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.Scatter.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
+GPRT_API void
+gprtRayGenLaunch2D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x, int dims_y)
+{
+  LOG_API_CALL();
+  gprtRayGenLaunch3D(_context, _rayGen,dims_x,dims_y,1);
+}
 
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
+GPRT_API void
+gprtRayGenLaunch3D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x, int dims_y, int dims_z)
+{
+  LOG_API_CALL();
+  assert(_rayGen);
 
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.Scatter.module);
+  Context *context = (Context*)_context;
+  RayGen *raygen = (RayGen*)_rayGen;
+  VkResult err;
 
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.Scatter.module;
-      shaderStage.pName = entryPoint.c_str();
+  VkCommandBufferBeginInfo cmdBufInfo{};
+  cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
+  err = vkBeginCommandBuffer(context->graphicsCommandBuffer, &cmdBufInfo);
 
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.Scatter.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
-
-    {
-      VkResult err = VK_SUCCESS;
-      std::string entryPoint = std::string("__compute__") + std::string(sortStages.ScatterPayload.entryPoint);
-      auto binary = module->getBinary("COMPUTE");
-
-      VkShaderModuleCreateInfo moduleCreateInfo = {};
-      moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      moduleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
-      moduleCreateInfo.pCode = binary.data();
-
-      err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &sortStages.ScatterPayload.module);
-
-      VkPipelineShaderStageCreateInfo shaderStage = {};
-      shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      shaderStage.module = sortStages.ScatterPayload.module;
-      shaderStage.pName = entryPoint.c_str();
-
-      VkComputePipelineCreateInfo computePipelineCreateInfo = {};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.layout = sortStages.layout;
-      computePipelineCreateInfo.flags = 0;
-      computePipelineCreateInfo.stage = shaderStage;
-
-      // At this point, create all internal compute pipelines as well.
-      err = vkCreateComputePipelines(logicalDevice, cache, 1, &computePipelineCreateInfo, nullptr,
-                                     &sortStages.ScatterPayload.pipeline);
-      if (err != VK_SUCCESS) {
-        LOG_ERROR("failed to create sort pipeline! Are all entrypoint names correct? \n" + errorString(err));
-      }
-    }
-
-    // todo, destroy the above stuff
+  if (context->queryRequested) {
+    vkCmdResetQueryPool(context->graphicsCommandBuffer,  context->queryPool, 0, 2);
+    vkCmdWriteTimestamp(context->graphicsCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, context->queryPool, 0);
   }
 
-  void destroySortStages() {
-    vkDestroyPipeline(logicalDevice, sortStages.ScatterPayload.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, sortStages.Scatter.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, sortStages.ScanAdd.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, sortStages.Scan.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, sortStages.CountReduce.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, sortStages.Count.pipeline, nullptr);
-    sortStages.ScatterPayload.pipeline = VK_NULL_HANDLE;
-    sortStages.Scatter.pipeline = VK_NULL_HANDLE;
-    sortStages.ScanAdd.pipeline = VK_NULL_HANDLE;
-    sortStages.Scan.pipeline = VK_NULL_HANDLE;
-    sortStages.CountReduce.pipeline = VK_NULL_HANDLE;
-    sortStages.Count.pipeline = VK_NULL_HANDLE;
+  vkCmdBindPipeline(
+    context->graphicsCommandBuffer,
+    VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+    context->pipeline);
 
-    vkDestroyShaderModule(logicalDevice, sortStages.ScatterPayload.module, nullptr);
-    vkDestroyShaderModule(logicalDevice, sortStages.Scatter.module, nullptr);
-    vkDestroyShaderModule(logicalDevice, sortStages.ScanAdd.module, nullptr);
-    vkDestroyShaderModule(logicalDevice, sortStages.Scan.module, nullptr);
-    vkDestroyShaderModule(logicalDevice, sortStages.CountReduce.module, nullptr);
-    vkDestroyShaderModule(logicalDevice, sortStages.Count.module, nullptr);
-    sortStages.ScatterPayload.module = VK_NULL_HANDLE;
-    sortStages.Scatter.module = VK_NULL_HANDLE;
-    sortStages.ScanAdd.module = VK_NULL_HANDLE;
-    sortStages.Scan.module = VK_NULL_HANDLE;
-    sortStages.CountReduce.module = VK_NULL_HANDLE;
-    sortStages.Count.module = VK_NULL_HANDLE;
+  struct PushConstants {
+    uint64_t pad[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  } pushConstants;
+  vkCmdPushConstants(context->graphicsCommandBuffer,  context->pipelineLayout, 
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR 
+    | VK_SHADER_STAGE_ANY_HIT_BIT_KHR 
+    | VK_SHADER_STAGE_INTERSECTION_BIT_KHR 
+    | VK_SHADER_STAGE_MISS_BIT_KHR 
+    | VK_SHADER_STAGE_RAYGEN_BIT_KHR, 
+    0, sizeof(PushConstants), &pushConstants
+  );
 
-    vkDestroyPipelineLayout(logicalDevice, sortStages.layout, nullptr);
-    sortStages.layout = VK_NULL_HANDLE;
+  auto getBufferDeviceAddress = [](VkDevice device, VkBuffer buffer) -> uint64_t
+	{
+		VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+		bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+		bufferDeviceAI.buffer = buffer;
+		return gprt::vkGetBufferDeviceAddress(device, &bufferDeviceAI);
+	};
 
-    vkFreeDescriptorSets(logicalDevice, sortStages.pool, 1, &sortStages.m_SortDescriptorSetScratch);
-    vkFreeDescriptorSets(logicalDevice, sortStages.pool, 2, sortStages.m_SortDescriptorSetScanSets);
-    vkFreeDescriptorSets(logicalDevice, sortStages.pool, 2, sortStages.m_SortDescriptorSetInputOutput);
+  auto alignedSize = [](uint32_t value, uint32_t alignment) -> uint32_t
+  {
+    return (value + alignment - 1) & ~(alignment - 1);
+  };
 
-    vkDestroyDescriptorSetLayout(logicalDevice, sortStages.m_SortDescriptorSetLayoutScratch, nullptr);
-    vkDestroyDescriptorSetLayout(logicalDevice, sortStages.m_SortDescriptorSetLayoutScan, nullptr);
-    vkDestroyDescriptorSetLayout(logicalDevice, sortStages.m_SortDescriptorSetLayoutInputOutputs, nullptr);
+  const uint32_t handleSize = context->rayTracingPipelineProperties.shaderGroupHandleSize;
+  const uint32_t maxGroupSize = context->rayTracingPipelineProperties.maxShaderGroupStride;
+  const uint32_t groupAlignment = context->rayTracingPipelineProperties.shaderGroupHandleAlignment;
+  const uint32_t maxShaderRecordStride = context->rayTracingPipelineProperties.maxShaderGroupStride;
 
-    vkDestroyDescriptorPool(logicalDevice, sortStages.pool, nullptr);
-  }
+  // for the moment, just assume the max group size
+  const uint32_t recordSize = alignedSize(std::min(maxGroupSize, uint32_t(4096)), groupAlignment);
+  uint64_t baseAddr = getBufferDeviceAddress(
+    context->logicalDevice, context->shaderBindingTable.buffer);
 
-  VkCommandBuffer beginSingleTimeCommands(VkCommandPool pool) {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = pool;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(logicalDevice, &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-  }
-
-  void endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool pool, VkQueue queue) {
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
-
-    vkFreeCommandBuffers(logicalDevice, pool, 1, &commandBuffer);
-  }
-
-  void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(graphicsCommandPool);
-
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-
-    // If this layout is "VK_IMAGE_LAYOUT_UNDEFINED", we might lose the contents
-    // of the original image. I'm assuming this is ok.
-    barrier.oldLayout = oldLayout;
-
-    // The new layout for the image
-    barrier.newLayout = newLayout;
-
-    // If we're transferring which queue owns this image, we need to set these.
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-    // specify the image that is affected and the specific parts of that image.
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
-      sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-      barrier.srcAccessMask = 0;
-      destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-      sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-
-      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-      barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-    } else {
-      throw std::invalid_argument("unsupported layout transition!");
+  // find raygen in current list of raygens
+  int computeOffset = context->computePrograms.size() * recordSize;
+  int raygenOffset = 0;
+  for (int i = 0; i < context->raygenPrograms.size(); ++i) {
+    if (context->raygenPrograms[i] == raygen) {
+      raygenOffset = i * recordSize;
+      break;
     }
-
-    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-    endSingleTimeCommands(commandBuffer, graphicsCommandPool, graphicsQueue);
   }
 
-  // For ImGui
-  void setRasterAttachments(Texture *colorTexture, Texture *depthTexture) {
-    if (colorTexture->width != depthTexture->width || colorTexture->height != depthTexture->height) {
-      throw std::runtime_error("Error, color and depth attachment textures must have equal dimensions!");
-    } else {
-      imgui.width = colorTexture->width;
-      imgui.height = colorTexture->height;
+  VkStridedDeviceAddressRegionKHR raygenShaderSbtEntry{};
+  raygenShaderSbtEntry.deviceAddress = baseAddr + raygenOffset + computeOffset;
+  raygenShaderSbtEntry.stride = recordSize;
+  raygenShaderSbtEntry.size = raygenShaderSbtEntry.stride; // for raygen, can only be one. this needs to be the same as stride.
+  // * context->raygenPrograms.size();
+
+  VkStridedDeviceAddressRegionKHR missShaderSbtEntry{};
+  if (context->missPrograms.size() > 0) {
+    missShaderSbtEntry.deviceAddress = baseAddr + recordSize * context->raygenPrograms.size() + recordSize * context->computePrograms.size() ;
+    missShaderSbtEntry.stride = recordSize;
+    missShaderSbtEntry.size = missShaderSbtEntry.stride * context->missPrograms.size();
+  }
+  VkStridedDeviceAddressRegionKHR hitShaderSbtEntry{};
+  size_t numHitRecords = context->getNumHitRecords();
+  if (numHitRecords > 0) {
+    hitShaderSbtEntry.deviceAddress = baseAddr + recordSize * (context->computePrograms.size() + context->raygenPrograms.size() + context->missPrograms.size());
+    hitShaderSbtEntry.stride = recordSize;
+    hitShaderSbtEntry.size = hitShaderSbtEntry.stride * numHitRecords;
+  }
+
+  VkStridedDeviceAddressRegionKHR callableShaderSbtEntry{}; // empty
+  callableShaderSbtEntry.deviceAddress = 0;
+  // callableShaderSbtEntry.stride = handleSizeAligned;
+  // callableShaderSbtEntry.size = handleSizeAligned;
+
+  gprt::vkCmdTraceRays(
+    context->graphicsCommandBuffer,
+    &raygenShaderSbtEntry,
+    &missShaderSbtEntry,
+    &hitShaderSbtEntry,
+    &callableShaderSbtEntry,
+    dims_x,
+    dims_y,
+    dims_z);
+  
+  if (context->queryRequested)
+    vkCmdWriteTimestamp(context->graphicsCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->queryPool, 1);
+
+  err = vkEndCommandBuffer(context->graphicsCommandBuffer);
+  if (err) GPRT_RAISE("failed to end command buffer! : \n" + errorString(err));
+
+  VkSubmitInfo submitInfo;
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.pNext = NULL;
+  submitInfo.waitSemaphoreCount = 0;
+  submitInfo.pWaitSemaphores = nullptr;//&acquireImageSemaphoreHandleList[currentFrame];
+  submitInfo.pWaitDstStageMask = nullptr;//&pipelineStageFlags;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &context->graphicsCommandBuffer;
+  submitInfo.signalSemaphoreCount = 0;
+  submitInfo.pSignalSemaphores = nullptr;//&writeImageSemaphoreHandleList[currentImageIndex]};
+
+  err = vkQueueSubmit(context->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  if (err) GPRT_RAISE("failed to submit to queue! : \n" + errorString(err));
+
+  err = vkQueueWaitIdle(context->graphicsQueue);
+  if (err) GPRT_RAISE("failed to wait for queue idle! : \n" + errorString(err));
+}
+
+GPRT_API void
+gprtComputeLaunch1D(GPRTContext _context, GPRTCompute _compute, int dims_x)
+{
+  LOG_API_CALL();
+  gprtComputeLaunch2D(_context, _compute,dims_x,1);
+}
+
+GPRT_API void
+gprtComputeLaunch2D(GPRTContext _context, GPRTCompute _compute, int dims_x, int dims_y)
+{
+  LOG_API_CALL();
+  gprtComputeLaunch3D(_context, _compute,dims_x,dims_y,1);
+}
+
+GPRT_API void
+gprtComputeLaunch3D(GPRTContext _context, GPRTCompute _compute, int dims_x, int dims_y, int dims_z)
+{
+  LOG_API_CALL();
+  assert(_compute);
+
+  Context *context = (Context*)_context;
+  Compute *compute = (Compute*)_compute;
+  VkResult err;
+
+  VkCommandBufferBeginInfo cmdBufInfo{};
+  cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+  err = vkBeginCommandBuffer(context->graphicsCommandBuffer, &cmdBufInfo);
+
+  if (context->queryRequested) {
+    vkCmdResetQueryPool(context->graphicsCommandBuffer,  context->queryPool, 0, 2);
+    vkCmdWriteTimestamp(context->graphicsCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, context->queryPool, 0);
+  }
+  
+  vkCmdBindPipeline(
+    context->graphicsCommandBuffer,
+    VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+    context->pipeline);
+
+  struct PushConstants {
+    uint64_t pad[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  } pushConstants;
+  vkCmdPushConstants(context->graphicsCommandBuffer,  context->pipelineLayout, 
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR 
+    | VK_SHADER_STAGE_ANY_HIT_BIT_KHR 
+    | VK_SHADER_STAGE_INTERSECTION_BIT_KHR 
+    | VK_SHADER_STAGE_MISS_BIT_KHR 
+    | VK_SHADER_STAGE_RAYGEN_BIT_KHR, // todo, replace eventually with compute.
+    0, sizeof(PushConstants), &pushConstants
+  );
+
+  auto getBufferDeviceAddress = [](VkDevice device, VkBuffer buffer) -> uint64_t
+	{
+		VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+		bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+		bufferDeviceAI.buffer = buffer;
+		return gprt::vkGetBufferDeviceAddress(device, &bufferDeviceAI);
+	};
+
+  auto alignedSize = [](uint32_t value, uint32_t alignment) -> uint32_t
+  {
+    return (value + alignment - 1) & ~(alignment - 1);
+  };
+
+  const uint32_t handleSize = context->rayTracingPipelineProperties.shaderGroupHandleSize;
+  const uint32_t maxGroupSize = context->rayTracingPipelineProperties.maxShaderGroupStride;
+  const uint32_t groupAlignment = context->rayTracingPipelineProperties.shaderGroupHandleAlignment;
+  const uint32_t maxShaderRecordStride = context->rayTracingPipelineProperties.maxShaderGroupStride;
+
+  // for the moment, just assume the max group size
+  const uint32_t recordSize = alignedSize(std::min(maxGroupSize, uint32_t(4096)), groupAlignment);
+  uint64_t baseAddr = getBufferDeviceAddress(
+    context->logicalDevice, context->shaderBindingTable.buffer);
+
+  // find compute program in current list of compute programs
+  int computeOffset = 0;
+  for (int i = 0; i < context->computePrograms.size(); ++i) {
+    if (context->computePrograms[i] == compute) {
+      computeOffset = i * recordSize;
+      break;
     }
+  }
 
-    imgui.colorAttachment = colorTexture;
-    imgui.depthAttachment = depthTexture;
+  VkStridedDeviceAddressRegionKHR raygenShaderSbtEntry{};
+  raygenShaderSbtEntry.deviceAddress = baseAddr + computeOffset;
+  raygenShaderSbtEntry.stride = recordSize;
+  raygenShaderSbtEntry.size = raygenShaderSbtEntry.stride; // can only be one.
 
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = colorTexture->format;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    // clear here says to clear the values to a constant at start.
-    // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;   // DONT_CARE;
-    // save rasterized fragments to memory
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // not currently using a stencil
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    // Initial and final layouts of the texture
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+  VkStridedDeviceAddressRegionKHR missShaderSbtEntry{};
+  VkStridedDeviceAddressRegionKHR hitShaderSbtEntry{};
+  VkStridedDeviceAddressRegionKHR callableShaderSbtEntry{};
+  
+  gprt::vkCmdTraceRays(
+    context->graphicsCommandBuffer,
+    &raygenShaderSbtEntry,
+    &missShaderSbtEntry,
+    &hitShaderSbtEntry,
+    &callableShaderSbtEntry,
+    dims_x,
+    dims_y,
+    dims_z);
 
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = depthTexture->format;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;   // VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+  if (context->queryRequested)
+    vkCmdWriteTimestamp(context->graphicsCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->queryPool, 1);
 
-    std::vector<VkAttachmentDescription> attachments = {colorAttachment, depthAttachment};
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    createInfo.pNext = nullptr;
-    createInfo.attachmentCount = (uint32_t)attachments.size();
-    createInfo.pAttachments = attachments.data();
-    createInfo.subpassCount = 1;
-    createInfo.pSubpasses = &subpass;
-    createInfo.dependencyCount = 1;
-    createInfo.pDependencies = &dependency;
-
-    vkCreateRenderPass(logicalDevice, &createInfo, nullptr, &imgui.renderPass);
-
-    VkImageView attachmentViews[] = {imgui.colorAttachment->imageView, imgui.depthAttachment->imageView};
-
-    VkFramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = imgui.renderPass;
-    framebufferInfo.attachmentCount = 2;
-    framebufferInfo.pAttachments = attachmentViews;
-    framebufferInfo.width = imgui.width;
-    framebufferInfo.height = imgui.height;
-    framebufferInfo.layers = 1;
-
-    if (vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &imgui.frameBuffer) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create framebuffer!");
-    }
-
-    // this initializes imgui for Vulkan
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = instance;
-    init_info.PhysicalDevice = physicalDevice;
-    init_info.Device = logicalDevice;
-    init_info.Queue = graphicsQueue;
-    init_info.DescriptorPool = imguiPool;
-    init_info.MinImageCount = 2;
-    init_info.ImageCount = 2;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-    ImGui_ImplVulkan_Init(&init_info, imgui.renderPass);
-
-    // execute a gpu command to upload imgui font textures
-    VkCommandBufferBeginInfo cmdBufInfo{};
-    cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    VK_CHECK_RESULT(vkBeginCommandBuffer(graphicsCommandBuffer, &cmdBufInfo));
-    ImGui_ImplVulkan_CreateFontsTexture(graphicsCommandBuffer);
-    VK_CHECK_RESULT(vkEndCommandBuffer(graphicsCommandBuffer));
+  err = vkEndCommandBuffer(context->graphicsCommandBuffer);
+  if (err) GPRT_RAISE("failed to end command buffer! : \n" + errorString(err));
 
     VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
