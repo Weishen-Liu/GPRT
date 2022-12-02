@@ -57,6 +57,7 @@
 extern GPRTProgram new_example_deviceCode;
 
 const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
+// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj";
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
 const int NUM_VERTICES = 8;

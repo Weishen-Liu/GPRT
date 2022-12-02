@@ -33,6 +33,8 @@ struct Payload
   int find_hit;
   float3 primitive_normal;
   float tHit;
+  float3 rayDir;
+  float3 rayOrg;
 };
 
 float3 cartesian(float phi, float sinTheta, float cosTheta)
@@ -178,12 +180,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
       Tn *= payload.color * 0.8;
 
-      // Need to use hemisphere respect to normal
-      rayDesc.Origin = rayDesc.Origin + payload.tHit * rayDesc.Direction;
-
-      float2 random = rand_2_10(screen);
-      float3 sample_dir = uniform_sample_hemisphere(random); // {0.f, 0.f, 1.f}
-      rayDesc.Direction = transform_to_look_at_direction(payload.primitive_normal, rayDesc.Origin, sample_dir);
+      rayDesc.Origin = payload.rayOrg;
+      rayDesc.Direction = payload.rayDir;
     }
   }
 
@@ -195,28 +193,52 @@ struct Attributes {
   float2 bc;
 };
 
+float3 get_triangle_barycentrics(float3 P, float3 A, float3 B, float3 C)
+{
+  float3 v0 = B - A;
+  float3 v1 = C - A;
+  float3 v2 = P - A;
+  float d00 = dot(v0, v0);
+  float d01 = dot(v0, v1);
+  float d11 = dot(v1, v1);
+  float d20 = dot(v2, v0);
+  float d21 = dot(v2, v1);
+  float denom = d00 * d11 - d01 * d01;
+  float u = (d11 * d20 - d01 * d21) / denom;
+  float v = (d00 * d21 - d01 * d20) / denom;
+  float w = 1.0f - u - v;
+  return float3(u, v, w);
+}
+
 GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
-  // compute normal:
   uint   primID = PrimitiveIndex();
   float3 rayDir = WorldRayDirection();
+  payload.tHit = RayTCurrent();
+  payload.rayOrg = WorldRayOrigin() + rayDir * payload.tHit;
+
+  // compute normal:
   int3   index  = gprt::load<int3>(record.index, primID);
-  // float3 A      = gprt::load<float3>(record.vertex, index.x);
-  // float3 B      = gprt::load<float3>(record.vertex, index.y);
-  // float3 C      = gprt::load<float3>(record.vertex, index.z);
+  float3 A      = gprt::load<float3>(record.vertex, index.x);
+  float3 B      = gprt::load<float3>(record.vertex, index.y);
+  float3 C      = gprt::load<float3>(record.vertex, index.z);
   // float3 Ng     = normalize(cross(B-A,C-A));
   // payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * gprt::load<float3>(record.color, index.x);
   // payload.primitive_normal = Ng;
 
-  float  u      = attributes.bc.x;
-  float  v      = attributes.bc.y;
-  float3 Ns     = (1.f-u-v) * gprt::load<float3>(record.normal, index.x) + u * gprt::load<float3>(record.normal, index.y) + v * gprt::load<float3>(record.normal, index.z);
+  float3 triangle_barycentrics = get_triangle_barycentrics(payload.rayOrg, A, B, C);
+
+  float3 Ns     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
   float3 current_color = gprt::load<float3>(record.color, index.x);
   payload.color = (.2f + .8f * abs(dot(rayDir,Ns))) * current_color;
   payload.primitive_normal = Ns;
+  
+  // Use hemisphere respect to normal
+  float2 random = rand_2_10(attributes.bc);
+  float3 sample_dir = uniform_sample_hemisphere(random); // {0.f, 0.f, 1.f}
+  payload.rayDir = transform_to_look_at_direction(payload.primitive_normal, payload.rayOrg, sample_dir);
 
   payload.find_hit = 1;
-  payload.tHit = RayTCurrent();
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
