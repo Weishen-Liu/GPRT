@@ -99,9 +99,9 @@ float transform[3][4] =
 const int2 fbSize = {800,600};
 GLuint fbTexture {0};
 
-float3 lookFrom = {-4.f,-3.f,-2.f};
+float3 lookFrom = {4.f,0.f,2.f};
 float3 lookAt = {0.f,0.f,0.f};
-float3 lookUp = {0.f,1.f,0.f};
+float3 lookUp = {0.f,0.f,-1.f};
 float cosFovy = 0.66f;
 
 #include <iostream>
@@ -213,7 +213,8 @@ int main(int ac, char **av)
                         missProgVars,-1);
 
   // ----------- set variables  ----------------------------
-  gprtMissSet3f(miss,"color0",0.1f,0.1f,0.1f);
+  gprtMissSet3f(miss,"color0",1.f,1.f,1.f);
+  // gprtMissSet3f(miss,"color0",0.1f,0.1f,0.1f);
   gprtMissSet3f(miss,"color1",.0f,.0f,.0f);
 
   // -------------------------------------------------------
@@ -398,6 +399,7 @@ int main(int ac, char **av)
   glfwTerminate();
 
   gprtBufferDestroy(vertexBuffer);
+  gprtBufferDestroy(normalBuffer);
   gprtBufferDestroy(indexBuffer);
   gprtBufferDestroy(colorBuffer);
   gprtBufferDestroy(frameBuffer);
