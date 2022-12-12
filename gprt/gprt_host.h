@@ -485,6 +485,18 @@ GPRT_API void gprtTrianglesSetIndices(GPRTGeom triangles,
                                      size_t stride,
                                      size_t offset);
 
+GPRT_API void gprtTrianglesSetMetal(GPRTGeom triangles,
+                                     GPRTBuffer metals,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset);
+
+GPRT_API void gprtTrianglesSetLambertian(GPRTGeom triangles,
+                                     GPRTBuffer lambertians,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset);
+
 /*! set the aabb positions (minX, minY, minZ, maxX, maxY, maxZ) 
   for the given AABB geometry. This _has_ to be set before the accel(s) 
   that this geom is used in get built. */

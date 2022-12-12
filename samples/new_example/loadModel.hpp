@@ -18,6 +18,10 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#ifndef   INCLUDE_MATERIAL
+#define   INCLUDE_MATERIAL
+#include "./materials/material.hpp"
+#endif
 
 struct Vertex
 {
@@ -70,11 +74,15 @@ namespace std {
     };
 }
 
-void loadModel(const std::string MODEL_PATH,
-               std::vector<float3>& list_of_vertices,
-               std::vector<int3>& list_of_indices,
-               std::vector<float3>& list_of_colors,
-               std::vector<float3>&list_of_vertex_normals)
+void loadModel(
+    const std::string MODEL_PATH,
+    std::vector<float3>& list_of_vertices,
+    std::vector<int3>& list_of_indices,
+    std::vector<float3>& list_of_colors,
+    std::vector<float3>&list_of_vertex_normals,
+    std::vector<Lambertian>&list_of_lambertians,
+    std::vector<Metal>&list_of_metals
+)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -97,11 +105,16 @@ void loadModel(const std::string MODEL_PATH,
                 attrib.vertices[3 * index.vertex_index + 2]
             };
 
-            vertex.normal = {
-                attrib.normals[3 * index.normal_index + 0],
-                attrib.normals[3 * index.normal_index + 1],
-                attrib.normals[3 * index.normal_index + 2]
-            };
+            if (attrib.normals.size()) {
+                vertex.normal = {
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
+                };
+            } else {
+                vertex.normal = float3(0.f, 0.f, 0.f);
+
+            }
 
             // vertex.texCoord = {
             //     attrib.texcoords[2 * index.texcoord_index + 0],
@@ -124,5 +137,20 @@ void loadModel(const std::string MODEL_PATH,
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
+
+        Lambertian lambertian;
+        lambertian.albedo = float3(1.f, 1.f, 1.f);
+        // // float2 random = rand_2_10(float2(rayOrg.x, rayOrg.y));
+        // // lambertian.albedo = 0.5f*(1.f+hack_sampling_hemisphere(1, random, normal));
+        list_of_lambertians.push_back(lambertian);
+
+        Metal metal;
+        metal.albedo = float3(0.5f, 0.5f, 0.5f);
+        metal.fuzz = 0.5f;
+        // // float2 random = rand_2_10(float2(rayOrg.x, rayOrg.y));
+        // // metal.albedo = 0.5f*(1.f+hack_sampling_hemisphere(1, random, normal));
+        // // metal.fuzz = 0.5f * random.x;
+        list_of_metals.push_back(metal);
+
     }
 }

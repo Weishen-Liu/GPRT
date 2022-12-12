@@ -38,11 +38,18 @@ struct TrianglesGeomData
   // /*! base color we use for the entire mesh */
   // alignas(16) float3 color;
   /*! array/buffer of color */
-  alignas(16) gprt::Buffer color; // vec3f *  
+  alignas(16) gprt::Buffer color; // vec3f * 
+
+  alignas(16) gprt::Buffer lambertian; // vec3f *  
+  alignas(16) gprt::Buffer metal; // vec3f *  
+
 };
 
 struct RayGenData
 {
+  alignas(16) gprt::Buffer accBuffer;
+  alignas(16) int  accId;
+
   alignas(16) gprt::Buffer fbPtr;
 
   alignas(8) int2 fbSize;
@@ -62,3 +69,22 @@ struct MissProgData
   alignas(16) float3  color0;
   alignas(16) float3  color1;
 };
+
+struct ScatterResult
+{
+  int scatterEvent;
+  float3 scatteredOrigin;
+  float3 scatteredDirection;
+  float3 attenuation;
+};
+
+struct Payload
+{
+  float3 color;
+  // int find_hit;
+  // float tHit;
+  // float3 rayDir;
+  // float3 rayOrg;
+  ScatterResult scatterResult;
+};
+

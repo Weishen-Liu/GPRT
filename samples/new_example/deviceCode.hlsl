@@ -20,22 +20,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef   INCLUDE_DEVICE_CODE
+#define   INCLUDE_DEVICE_CODE
+// our device-side data structures
 #include "deviceCode.h"
+#endif
+
 #include "gprt.h"
+
+// #ifndef   INCLUDE_MATERIAL
+// #define   INCLUDE_MATERIAL
+// #include "./materials/material.hpp"
+// #endif
+#include "./materials/material.hpp"
 
 #ifndef M_PI
 #define M_PI 3.1415926f
 #endif
-
-struct Payload
-{
-  float3 color;
-  int find_hit;
-  float3 primitive_normal;
-  float tHit;
-  float3 rayDir;
-  float3 rayOrg;
-};
 
 float3 cartesian(float phi, float sinTheta, float cosTheta)
 {
@@ -70,7 +71,7 @@ float2 rand_2_10(float2 uv) {
 
 float3 transform_to_look_at_direction(float3 lookingAt, float3 sampleOrg, float3 sampleDirection)
 {
-  float3 pointA = lookingAt;
+  float3 pointA = lookingAt - sampleOrg;
   float magnitude;
   float x_degree = 0.f;
   float y_degree = 0.f;
@@ -138,9 +139,75 @@ float3 transform_to_look_at_direction(float3 lookingAt, float3 sampleOrg, float3
   return new_ray_direction;
 }
 
+float3 hack_sampling_hemisphere(float radius, float2 s, float3 normal)
+{
+  float3 sample_dir = uniform_sample_sphere(radius, s);
+  if (dot(sample_dir, normal) < 0) {
+    sample_dir *= -1;
+  } else if (dot(sample_dir, normal) == 0) {
+    sample_dir += float3(0.01f, 0.01f, 0.01f);
+    if (dot(sample_dir, normal) < 0) {
+      sample_dir *= -1;
+    }
+  }
+  return sample_dir;
+}
+
+float3 reflect(float3 v, float3 n)
+{
+  return v - 2.0f*dot(v, n)*n;
+}
+
+float3 randomPointInUnitSphere(float2 rand) {
+  float3 p;
+  do {
+    p = 2.0f*uniform_sample_hemisphere(rand) - float3(1, 1, 1);
+  } while (dot(p,p) >= 1.0f);
+  return p;
+}
+
+ScatterResult scatter(Metal metal, float3 P, float3 N)
+{
+  float3 org   = WorldRayOrigin();
+  float3 dir   = WorldRayDirection();
+
+  if (dot(N,dir)  > 0.f)
+    N = -N;
+  N = normalize(N);
+  
+  ScatterResult result;
+  float3 reflected = reflect(normalize(dir),N);
+  result.scatteredOrigin = P;
+  result.scatteredDirection = (reflected+metal.fuzz*randomPointInUnitSphere(float2(org.x, org.y)));
+  result.attenuation         = metal.albedo;
+  result.scatterEvent = int(dot(result.scatteredDirection, N) > 0.f);
+  return result;
+}
+
+ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
+{
+  float3 org   = WorldRayOrigin();
+  float3 dir   = WorldRayDirection();
+
+  if (dot(N,dir)  > 0.f)
+    N = -N;
+  N = normalize(N);
+
+  float3 target = P + (N + randomPointInUnitSphere(float2(org.x, org.y)));
+
+  
+  // return scattering event
+  ScatterResult result;
+  result.scatteredOrigin     = P;
+  result.scatteredDirection  = (target-P);
+  result.attenuation         = lambertian.albedo;
+  result.scatterEvent        = true;
+  return result;
+}
+
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
-  float3 total_payload_color = 0;
+  float3 total_payload_color = float3(0.f, 0.f, 0.f);
   int total_sample_per_pixel = 100;
   int ray_depth = 5;
   uint2 pixelID = DispatchRaysIndex().xy;
@@ -160,7 +227,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     rayDesc.TMax = 10000.0;
     RaytracingAccelerationStructure world = gprt::getAccelHandle(record.world);
 
-    float3 Tn = float3(1.f, 1.f, 1.f);
+    float3 attenuation = float3(1.f, 1.f, 1.f);
     for (int i = 0; i < ray_depth; i++) {
       TraceRay(
         world, // the tree
@@ -173,20 +240,26 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         payload // the payload IO
       );
 
-      if (!payload.find_hit) {
-        total_payload_color += payload.color * Tn;
+      if (payload.scatterResult.scatterEvent == 2) {
+        total_payload_color += payload.color * payload.scatterResult.attenuation;
         break;
+      } else if (payload.scatterResult.scatterEvent == 0) {
+        total_payload_color += float3(0.f, 0.f, 0.f);
+        break;
+      } else {
+        attenuation *= payload.scatterResult.attenuation;
+        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+        rayDesc.Direction = payload.scatterResult.scatteredDirection;
       }
-
-      Tn *= payload.color * 0.8;
-
-      rayDesc.Origin = payload.rayOrg;
-      rayDesc.Direction = payload.rayDir;
     }
   }
 
   const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
-  gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color/total_sample_per_pixel));
+  if (record.accId) {
+    total_payload_color = total_payload_color + gprt::load<float3>(record.accBuffer, fbOfs);
+  }
+  gprt::store(record.accBuffer, fbOfs, total_payload_color);
+  gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * total_sample_per_pixel))));
 }
 
 struct Attributes {
@@ -213,38 +286,58 @@ float3 get_triangle_barycentrics(float3 P, float3 A, float3 B, float3 C)
 GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
   uint   primID = PrimitiveIndex();
+  float3 rayOrg = WorldRayOrigin();
   float3 rayDir = WorldRayDirection();
-  payload.tHit = RayTCurrent();
-  payload.rayOrg = WorldRayOrigin() + rayDir * payload.tHit;
+  float tHit = RayTCurrent();
+  float3 targetPoint = rayOrg + rayDir * tHit;
 
   // compute normal:
   int3   index  = gprt::load<int3>(record.index, primID);
   float3 A      = gprt::load<float3>(record.vertex, index.x);
   float3 B      = gprt::load<float3>(record.vertex, index.y);
   float3 C      = gprt::load<float3>(record.vertex, index.z);
-  // float3 Ng     = normalize(cross(B-A,C-A));
-  // payload.color = (.2f + .8f * abs(dot(rayDir,Ng))) * gprt::load<float3>(record.color, index.x);
-  // payload.primitive_normal = Ng;
 
-  float3 triangle_barycentrics = get_triangle_barycentrics(payload.rayOrg, A, B, C);
+  float3 normal;
+  if (
+    gprt::load<float3>(record.normal, index.x).x == 0.f && 
+    gprt::load<float3>(record.normal, index.x).y == 0.f && 
+    gprt::load<float3>(record.normal, index.x).z == 0.f
+  ) {
+    normal     = normalize(cross(B-A,C-A));
+    payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * gprt::load<float3>(record.color, index.x);
+  } else {
+    float3 triangle_barycentrics = get_triangle_barycentrics(rayOrg, A, B, C);
+    normal     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + 
+                 triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + 
+                 triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
+    float3 current_color = gprt::load<float3>(record.color, index.x);
+    payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
+  }
 
-  float3 Ns     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
-  float3 current_color = gprt::load<float3>(record.color, index.x);
-  payload.color = (.2f + .8f * abs(dot(rayDir,Ns))) * current_color;
-  payload.primitive_normal = Ns;
-  
+  Metal metal  = gprt::load<Metal>(record.metal, primID);
+  payload.scatterResult = scatter(metal, targetPoint, normal);
+
+  Lambertian lambertian  = gprt::load<Lambertian>(record.lambertian, primID);
+  payload.scatterResult = scatter(lambertian, targetPoint, normal);
+
   // Use hemisphere respect to normal
-  float2 random = rand_2_10(attributes.bc);
-  float3 sample_dir = uniform_sample_hemisphere(random); // {0.f, 0.f, 1.f}
-  payload.rayDir = transform_to_look_at_direction(payload.primitive_normal, payload.rayOrg, sample_dir);
-
-  payload.find_hit = 1;
+  // float2 random = rand_2_10(float2(payload.rayOrg.x, payload.rayOrg.y));
+  // payload.rayDir = hack_sampling_hemisphere(1, random, normal);
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
 {
-  uint2 pixelID = DispatchRaysIndex().xy;  
-  int pattern = (pixelID.x / 8) ^ (pixelID.y/8);
-  payload.color = record.color0; //(pattern & 1) ? record.color1 : record.color0;
-  payload.find_hit = 0;
+  // uint2 pixelID = DispatchRaysIndex().xy;  
+  // int pattern = (pixelID.x / 8) ^ (pixelID.y/8);
+  // payload.color = (pattern & 1) ? record.color1 : record.color0;
+
+  float3 rayDir = WorldRayDirection();
+  const float t = 0.5f * (rayDir.y + 1.0f);
+  const float3 c = (1.0f - t) * float3(1.0f, 1.0f, 1.0f) + t * float3(0.5f, 0.7f, 1.0f);
+  payload.color = c;
+
+  ScatterResult result;
+  result.scatterEvent = 2;
+  payload.scatterResult = result;
+  // payload.find_hit = 0;
 }

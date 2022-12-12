@@ -937,6 +937,22 @@ struct TriangleGeom : public Geom {
   } index;
 
   struct {
+    size_t count  = 0; // number of material
+    size_t stride = 0; // stride between material
+    size_t offset = 0; // offset in bytes to the first index
+    size_t firstVertex = 0; // added to the index values before fetching vertices
+    Buffer* buffer = nullptr;
+  } lambertian;
+
+  struct {
+    size_t count  = 0; // number of material
+    size_t stride = 0; // stride between material
+    size_t offset = 0; // offset in bytes to the first index
+    size_t firstVertex = 0; // added to the index values before fetching vertices
+    Buffer* buffer = nullptr;
+  } metal;
+
+  struct {
     size_t count  = 0; // number of vertices
     size_t stride = 0; // stride between vertices
     size_t offset = 0; // an offset in bytes to the first vertex
@@ -1019,6 +1035,30 @@ struct TriangleGeom : public Geom {
     index.count = count;
     index.stride = stride;
     index.offset = offset;
+  }
+
+  void setLambertian(
+    Buffer* lambertians,
+    size_t count,
+    size_t stride,
+    size_t offset) 
+  {
+    lambertian.buffer = lambertians;
+    lambertian.count = count;
+    lambertian.stride = stride;
+    lambertian.offset = offset;
+  }
+
+  void setMetal(
+    Buffer* metals,
+    size_t count,
+    size_t stride,
+    size_t offset) 
+  {
+    metal.buffer = metals;
+    metal.count = count;
+    metal.stride = stride;
+    metal.offset = offset;
   }
 };
 
@@ -3795,6 +3835,32 @@ GPRT_API void gprtTrianglesSetIndices(GPRTGeom _triangles,
   Buffer *indices = (Buffer*)_indices;
   triangles->setIndices(indices, count, stride, offset);
   LOG("Setting triangle indices...");
+}
+
+GPRT_API void gprtTrianglesSetMetal(GPRTGeom _triangles,
+                                     GPRTBuffer _metals,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *metals = (Buffer*)_metals;
+  triangles->setMetal(metals, count, stride, offset);
+  LOG("Setting triangle metal...");
+}
+
+GPRT_API void gprtTrianglesSetLambertian(GPRTGeom _triangles,
+                                     GPRTBuffer _lambertians,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *lambertians = (Buffer*)_lambertians;
+  triangles->setLambertian(lambertians, count, stride, offset);
+  LOG("Setting triangle lambertian...");
 }
 
 void gprtAABBsSetPositions(GPRTGeom _aabbs, 
