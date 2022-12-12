@@ -53,11 +53,18 @@
 #include "loadModel.hpp"
 #include "loadTexture.hpp"
 
+#ifndef   INCLUDE_MATERIAL
+#define   INCLUDE_MATERIAL
+#include "./materials/material.hpp"
+#endif
+
 
 extern GPRTProgram new_example_deviceCode;
 
 const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj";
+// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj";
+// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj";
+// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj";
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
 const int NUM_VERTICES = 8;
@@ -86,6 +93,8 @@ int3 indices[NUM_INDICES] =
 
 std::vector<float3> list_of_vertices;
 std::vector<int3> list_of_indices;
+std::vector<Lambertian> list_of_lambertians;
+std::vector<Metal> list_of_metals;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
 
@@ -98,6 +107,7 @@ float transform[3][4] =
 
 // initial image resolution
 const int2 fbSize = {800,600};
+uint64_t accId = 0;
 GLuint fbTexture {0};
 
 float3 lookFrom = {4.f,0.f,2.f};
@@ -127,6 +137,8 @@ int main(int ac, char **av)
     // { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
     { "color",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,color)},
     { "normal",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,normal)},
+    { "metal",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,metal)},
+    { "lambertian",  GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData,lambertian)},
     { /* sentinel to mark end of list */ }
   };
   GPRTGeomType trianglesGeomType
@@ -147,12 +159,19 @@ int main(int ac, char **av)
   // triangle mesh
   // ------------------------------------------------------------------
 
-  // GPRTBuffer vertexBuffer
+  // GPRTBuffer vertexBuffer  
   //   = gprtHostBufferCreate(context,GPRT_FLOAT3,NUM_VERTICES,vertices);
   // GPRTBuffer indexBuffer
   //   = gprtDeviceBufferCreate(context,GPRT_INT3,NUM_INDICES,indices);
-  loadModel(MODEL_PATH, list_of_vertices, list_of_indices, list_of_colors, list_of_vertex_normals);
-  // loadTexture(TEXTURE_PATH);
+  loadModel(
+    MODEL_PATH,
+    list_of_vertices,
+    list_of_indices,
+    list_of_colors,
+    list_of_vertex_normals,
+    list_of_lambertians,
+    list_of_metals
+  );
   GPRTBuffer vertexBuffer
     = gprtHostBufferCreate(context,GPRT_FLOAT3,list_of_vertices.size(),static_cast<const void*>(list_of_vertices.data()));
   GPRTBuffer normalBuffer
@@ -161,11 +180,18 @@ int main(int ac, char **av)
     = gprtDeviceBufferCreate(context,GPRT_INT3,list_of_indices.size(),static_cast<const void*>(list_of_indices.data()));
   GPRTBuffer colorBuffer
     = gprtDeviceBufferCreate(context,GPRT_FLOAT3,list_of_colors.size(),static_cast<const void*>(list_of_colors.data()));
+  GPRTBuffer lambertianBuffer
+    = gprtDeviceBufferCreate(context,GPRT_USER_TYPE(list_of_lambertians[0]),list_of_lambertians.size(),static_cast<const void*>(list_of_lambertians.data()));
+  GPRTBuffer metalBuffer
+    = gprtDeviceBufferCreate(context,GPRT_USER_TYPE(list_of_metals[0]),list_of_metals.size(),static_cast<const void*>(list_of_metals.data()));
 
   GPRTBuffer transformBuffer
     = gprtDeviceBufferCreate(context,GPRT_TRANSFORM,1,transform);
   GPRTBuffer frameBuffer
     = gprtHostBufferCreate(context,GPRT_INT,fbSize.x*fbSize.y);
+
+  GPRTBuffer accBuffer
+    = gprtDeviceBufferCreate(context,GPRT_FLOAT3,fbSize.x * fbSize.y, nullptr);
 
   GPRTGeom trianglesGeom
     = gprtGeomCreate(context,trianglesGeomType);
@@ -178,12 +204,18 @@ int main(int ac, char **av)
                           list_of_indices.size(),sizeof(int3),0);
   gprtTrianglesSetVertexColor(trianglesGeom,colorBuffer,
                            list_of_colors.size(),sizeof(float3),0);
+  gprtTrianglesSetLambertian(trianglesGeom,lambertianBuffer,
+                           list_of_lambertians.size(),sizeof(Lambertian),0);
+  gprtTrianglesSetMetal(trianglesGeom,metalBuffer,
+                           list_of_metals.size(),sizeof(Metal),0);                        
 
   gprtGeomSetBuffer(trianglesGeom,"vertex",vertexBuffer);
   gprtGeomSetBuffer(trianglesGeom,"normal",normalBuffer);
   gprtGeomSetBuffer(trianglesGeom,"index",indexBuffer);
   // gprtGeomSet3f(trianglesGeom,"color",0,1,0);
   gprtGeomSetBuffer(trianglesGeom,"color",colorBuffer);
+  gprtGeomSetBuffer(trianglesGeom,"metal",metalBuffer);
+  gprtGeomSetBuffer(trianglesGeom,"lambertian",lambertianBuffer);
 
   // ------------------------------------------------------------------
   // the group/accel for that mesh
@@ -224,6 +256,8 @@ int main(int ac, char **av)
   GPRTVarDecl rayGenVars[] = {
     { "fbSize",        GPRT_INT2,   GPRT_OFFSETOF(RayGenData,fbSize)},
     { "fbPtr",         GPRT_BUFFER, GPRT_OFFSETOF(RayGenData,fbPtr)},
+    { "accBuffer",     GPRT_BUFFER, GPRT_OFFSETOF(RayGenData,accBuffer)},
+    { "accId",         GPRT_INT,    GPRT_OFFSETOF(RayGenData,accId)},
     { "world",         GPRT_ACCEL,  GPRT_OFFSETOF(RayGenData,world)},
     { "camera.pos",    GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData,camera.pos)},
     { "camera.dir_00", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData,camera.dir_00)},
@@ -239,9 +273,11 @@ int main(int ac, char **av)
                       rayGenVars,-1);
 
   // ----------- set variables  ----------------------------
-  gprtRayGenSetBuffer(rayGen,"fbPtr", frameBuffer);
-  gprtRayGenSet2iv(rayGen,"fbSize", (int32_t*)&fbSize);
-  gprtRayGenSetAccel(rayGen,"world", world);
+  gprtRayGenSetBuffer(rayGen,"accBuffer", accBuffer);
+  gprtRayGenSet1i    (rayGen,"accId",     (uint64_t)accId);
+  gprtRayGenSetBuffer(rayGen,"fbPtr",     frameBuffer);
+  gprtRayGenSet2iv   (rayGen,"fbSize",    (int32_t*)&fbSize);
+  gprtRayGenSetAccel (rayGen,"world",     world);
 
   // ##################################################################
   // build *SBT* required to trace the groups
@@ -294,6 +330,7 @@ int main(int ac, char **av)
     // If we click the mouse, we should rotate the camera
     if (state == GLFW_PRESS || firstFrame)
     {
+      accId = 0;
       firstFrame = false;
       float4 position = {lookFrom.x, lookFrom.y, lookFrom.z, 1.f};
       float4 pivot = {lookAt.x, lookAt.y, lookAt.z, 1.0};
@@ -334,10 +371,13 @@ int main(int ac, char **av)
       gprtRayGenSet3fv    (rayGen,"camera.dir_du",(float*)&camera_ddu);
       gprtRayGenSet3fv    (rayGen,"camera.dir_dv",(float*)&camera_ddv);
 
-      gprtBuildShaderBindingTable(context);
+      // gprtBuildShaderBindingTable(context);
     }
 
+    gprtRayGenSet1i(rayGen,"accId", (uint64_t)accId);
+    accId++;
     // Now, trace rays
+    gprtBuildShaderBindingTable(context);
     gprtRayGenLaunch2D(context,rayGen,fbSize.x,fbSize.y);
 
     // Render results to screen
@@ -402,8 +442,11 @@ int main(int ac, char **av)
   gprtBufferDestroy(vertexBuffer);
   gprtBufferDestroy(normalBuffer);
   gprtBufferDestroy(indexBuffer);
+  gprtBufferDestroy(metalBuffer);
+  gprtBufferDestroy(lambertianBuffer);
   gprtBufferDestroy(colorBuffer);
   gprtBufferDestroy(frameBuffer);
+  gprtBufferDestroy(accBuffer);
   gprtBufferDestroy(transformBuffer);
   gprtRayGenDestroy(rayGen);
   gprtMissDestroy(miss);
