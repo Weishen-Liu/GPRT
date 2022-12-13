@@ -179,6 +179,10 @@ ScatterResult scatter(Metal metal, float3 P, float3 N)
   float3 reflected = reflect(normalize(dir),N);
   result.scatteredOrigin = P;
   result.scatteredDirection = (reflected+metal.fuzz*randomPointInUnitSphere(float2(org.x, org.y)));
+
+  // float2 random = rand_2_10(float2(org.x, org.y));
+  // result.scatteredDirection = (reflected+metal.fuzz*hack_sampling_hemisphere(1, random, N));
+
   result.attenuation         = metal.albedo;
   result.scatterEvent = int(dot(result.scatteredDirection, N) > 0.f);
   return result;
@@ -195,6 +199,8 @@ ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
 
   float3 target = P + (N + randomPointInUnitSphere(float2(org.x, org.y)));
 
+  // float2 random = rand_2_10(float2(org.x, org.y));
+  // target = P + (N + hack_sampling_hemisphere(1, random, N));
   
   // return scattering event
   ScatterResult result;
@@ -241,7 +247,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       );
 
       if (payload.scatterResult.scatterEvent == 2) {
-        total_payload_color += payload.color * payload.scatterResult.attenuation;
+        total_payload_color += payload.color * attenuation;
         break;
       } else if (payload.scatterResult.scatterEvent == 0) {
         total_payload_color += float3(0.f, 0.f, 0.f);
