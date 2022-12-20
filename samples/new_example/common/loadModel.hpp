@@ -7,7 +7,7 @@
 #ifndef   INCLUDE_DEVICE_CODE
 #define   INCLUDE_DEVICE_CODE
 // our device-side data structures
-#include "deviceCode.h"
+#include "../deviceCode.h"
 #endif
 
 #include <iostream>
@@ -121,7 +121,7 @@ void loadModel(
             //     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
             // };
 
-            vertex.color = {1.0f, 1.0f, 1.0f};
+            vertex.color = {1.0f, 0.0f, 0.0f};
 
             if (uniqueVertices.count(vertex) == 0) {
                 uniqueVertices[vertex] = static_cast<uint32_t>(list_of_vertices.size());
@@ -139,7 +139,7 @@ void loadModel(
         list_of_indices.push_back(each_indices);
 
         Lambertian lambertian;
-        lambertian.albedo = float3(1.f, 1.f, 1.f);
+        lambertian.albedo = float3(0.f, 0.f, .25f);
         // // float2 random = rand_2_10(float2(rayOrg.x, rayOrg.y));
         // // lambertian.albedo = 0.5f*(1.f+hack_sampling_hemisphere(1, random, normal));
         list_of_lambertians.push_back(lambertian);

@@ -41,6 +41,11 @@
 #include <GLFW/glfw3.h>
 #endif
 
+#ifndef   INCLUDE_CAMERA
+#define   INCLUDE_CAMERA
+#include "./common/viewer.cpp"
+#endif
+
 #define LOG(message)                                            \
   std::cout << GPRT_TERMINAL_BLUE;                               \
   std::cout << "#gprt.sample(main): " << message << std::endl;   \
@@ -50,8 +55,8 @@
   std::cout << "#gprt.sample(main): " << message << std::endl;   \
   std::cout << GPRT_TERMINAL_DEFAULT;
 
-#include "loadModel.hpp"
-#include "loadTexture.hpp"
+#include "./common/loadModel.hpp"
+#include "./common/loadTexture.hpp"
 
 #ifndef   INCLUDE_MATERIAL
 #define   INCLUDE_MATERIAL
@@ -61,9 +66,10 @@
 
 extern GPRTProgram new_example_deviceCode;
 
-const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
+// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
 // const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj";
 // const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj";
+const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj";
 // const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj";
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
@@ -266,6 +272,10 @@ int main(int ac, char **av)
     { /* sentinel to mark end of list */ }
   };
 
+  // ----------- create camera  ----------------------------
+  Viewer viewer;
+  viewer.camera.setupCamera(/*from*/ lookFrom, /* at */ lookAt, /* up */ lookUp);
+
   // ----------- create object  ----------------------------
   GPRTRayGen rayGen
     = gprtRayGenCreate(context,module,"simpleRayGen",
@@ -311,6 +321,7 @@ int main(int ac, char **av)
   // ##################################################################
 
   LOG("launching ...");
+  // viewer.addCallBack(window);
 
   bool firstFrame = true;
   double xpos = 0.f, ypos = 0.f;
@@ -327,51 +338,88 @@ int main(int ac, char **av)
     }
     int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
 
+    // // If we click the mouse, we should rotate the camera
+    // if (state == GLFW_PRESS || firstFrame)
+    // {
+    //   accId = 0;
+    //   firstFrame = false;
+    //   float4 position = {camera.from.x, camera.from.y, camera.from.z, 1.f};
+    //   float4 pivot = {camera.at.x, camera.at.y, camera.at.z, 1.0};
+    //   #ifndef M_PI
+    //   #define M_PI 3.1415926f
+    //   #endif
+
+    //   // step 1 : Calculate the amount of rotation given the mouse movement.
+    //   float deltaAngleX = (2 * M_PI / fbSize.x);
+    //   float deltaAngleY = (M_PI / fbSize.y);
+    //   float xAngle = (lastxpos - xpos) * deltaAngleX;
+    //   float yAngle = (lastypos - ypos) * deltaAngleY;
+
+    //   // step 2: Rotate the camera around the pivot point on the first axis.
+    //   float4x4 rotationMatrixX = rotation_matrix(rotation_quat(camera.up, xAngle));
+    //   position = (mul(rotationMatrixX, (position - pivot))) + pivot;
+
+    //   // step 3: Rotate the camera around the pivot point on the second axis.
+    //   float3 lookRight = cross(camera.up, normalize(pivot - position).xyz());
+    //   float4x4 rotationMatrixY = rotation_matrix(rotation_quat(lookRight, yAngle));
+    //   camera.from = ((mul(rotationMatrixY, (position - pivot))) + pivot).xyz();
+
+    //   // ----------- compute variable values  ------------------
+    //   float3 camera_pos = camera.from;
+    //   float3 camera_d00
+    //     = normalize(camera.at-camera.from);
+    //   float aspect = float(fbSize.x) / float(fbSize.y);
+    //   float3 camera_ddu
+    //     = cosFovy * aspect * normalize(cross(camera_d00,camera.up));
+    //   float3 camera_ddv
+    //     = cosFovy * normalize(cross(camera_ddu,camera_d00));
+    //   camera_d00 -= 0.5f * camera_ddu;
+    //   camera_d00 -= 0.5f * camera_ddv;
+
+    //   // ----------- set variables  ----------------------------
+    //   gprtRayGenSet3fv    (rayGen,"camera.pos",   (float*)&camera_pos);
+    //   gprtRayGenSet3fv    (rayGen,"camera.dir_00",(float*)&camera_d00);
+    //   gprtRayGenSet3fv    (rayGen,"camera.dir_du",(float*)&camera_ddu);
+    //   gprtRayGenSet3fv    (rayGen,"camera.dir_dv",(float*)&camera_ddv);
+
+    //   // gprtBuildShaderBindingTable(context);
+    // }
+
     // If we click the mouse, we should rotate the camera
     if (state == GLFW_PRESS || firstFrame)
     {
       accId = 0;
       firstFrame = false;
-      float4 position = {lookFrom.x, lookFrom.y, lookFrom.z, 1.f};
-      float4 pivot = {lookAt.x, lookAt.y, lookAt.z, 1.0};
       #ifndef M_PI
       #define M_PI 3.1415926f
       #endif
 
-      // step 1 : Calculate the amount of rotation given the mouse movement.
-      float deltaAngleX = (2 * M_PI / fbSize.x);
-      float deltaAngleY = (M_PI / fbSize.y);
-      float xAngle = (lastxpos - xpos) * deltaAngleX;
-      float yAngle = (lastypos - ypos) * deltaAngleY;
-
-      // step 2: Rotate the camera around the pivot point on the first axis.
-      float4x4 rotationMatrixX = rotation_matrix(rotation_quat(lookUp, xAngle));
-      position = (mul(rotationMatrixX, (position - pivot))) + pivot;
-
-      // step 3: Rotate the camera around the pivot point on the second axis.
-      float3 lookRight = cross(lookUp, normalize(pivot - position).xyz());
-      float4x4 rotationMatrixY = rotation_matrix(rotation_quat(lookRight, yAngle));
-      lookFrom = ((mul(rotationMatrixY, (position - pivot))) + pivot).xyz();
-
-      // ----------- compute variable values  ------------------
-      float3 camera_pos = lookFrom;
-      float3 camera_d00
-        = normalize(lookAt-lookFrom);
-      float aspect = float(fbSize.x) / float(fbSize.y);
-      float3 camera_ddu
-        = cosFovy * aspect * normalize(cross(camera_d00,lookUp));
-      float3 camera_ddv
-        = cosFovy * normalize(cross(camera_ddu,camera_d00));
-      camera_d00 -= 0.5f * camera_ddu;
-      camera_d00 -= 0.5f * camera_ddv;
+      const float3 lookFrom = viewer.camera.from;
+      const float3 lookAt = viewer.camera.at;
+      const float3 lookUp = viewer.camera.up;
+      const float cosFovy = viewer.camera.cosFovy;
+      const float vfov = cosFovy / float(M_PI/180.f);;
+      // ........... compute variable values  ..................
+      const float3 vup = lookUp;
+      const float aspect = fbSize.x / float(fbSize.y);
+      const float theta = vfov * ((float)M_PI) / 180.0f;
+      const float half_height = tanf(theta / 2.0f);
+      const float half_width = aspect * half_height;
+      const float focusDist = 10.f;
+      const float3 origin = lookFrom;
+      const float3 w = normalize(lookFrom - lookAt);
+      const float3 u = normalize(cross(vup, w));
+      const float3 v = cross(w, u);
+      const float3 lower_left_corner
+        = origin - half_width * focusDist*u - half_height * focusDist*v - focusDist * w;
+      const float3 horizontal = 2.0f*half_width*focusDist*u;
+      const float3 vertical = 2.0f*half_height*focusDist*v;
 
       // ----------- set variables  ----------------------------
-      gprtRayGenSet3fv    (rayGen,"camera.pos",   (float*)&camera_pos);
-      gprtRayGenSet3fv    (rayGen,"camera.dir_00",(float*)&camera_d00);
-      gprtRayGenSet3fv    (rayGen,"camera.dir_du",(float*)&camera_ddu);
-      gprtRayGenSet3fv    (rayGen,"camera.dir_dv",(float*)&camera_ddv);
-
-      // gprtBuildShaderBindingTable(context);
+      gprtRayGenSet3fv    (rayGen,"camera.pos",   (float*)&origin);
+      gprtRayGenSet3fv    (rayGen,"camera.dir_00",(float*)&lower_left_corner);
+      gprtRayGenSet3fv    (rayGen,"camera.dir_du",(float*)&horizontal);
+      gprtRayGenSet3fv    (rayGen,"camera.dir_dv",(float*)&vertical);
     }
 
     gprtRayGenSet1i(rayGen,"accId", (uint64_t)accId);
