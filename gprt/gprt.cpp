@@ -57,6 +57,11 @@
 // library for windowing
 #include <GLFW/glfw3.h>
 
+// library for image output
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
+
 #if defined(_MSC_VER)
 //&& !defined(__PRETTY_FUNCTION__)
 #  define __PRETTY_FUNCTION__ __FUNCTION__
@@ -2317,15 +2322,18 @@ struct Context {
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions;
     if (requestedFeatures.window) {
-      if (!glfwInit())
-        throw std::runtime_error("Can't initialize GLFW");
-
-      if (!glfwVulkanSupported()) {
-        GPRT_RAISE("Window requested but unsupported!");
+      if (!glfwInit()) {
+      	LOG("Warning: Unable to create window. Falling back to headless mode.");
+	requestedFeatures.window = false;
       }
-      glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-      for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
-        instanceExtensions.push_back(glfwExtensions[i]);
+      else {
+        if (!glfwVulkanSupported()) {
+          GPRT_RAISE("Window requested but unsupported!");
+        }
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+          instanceExtensions.push_back(glfwExtensions[i]);
+        }
       }
     }
 
@@ -2371,6 +2379,8 @@ struct Context {
       if (err != VK_SUCCESS) {
         GPRT_RAISE("failed to create window surface! : \n" + errorString(err));
       }
+      // Poll some initial event values
+      glfwPollEvents();
     }
 
     /// 2. Select a Physical Device
@@ -3539,7 +3549,35 @@ GPRT_API bool gprtWindowShouldClose(GPRTContext _context) {
   return glfwWindowShouldClose(context->window);
 }
 
-GPRT_API void gprtPresentBuffer(GPRTContext _context, GPRTBuffer _buffer) {
+GPRT_API void gprtGetCursorPos(GPRTContext _context, 
+  double * xpos, double * ypos)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  if (!requestedFeatures.window) return;
+
+  glfwGetCursorPos(context->window, xpos, ypos);
+}
+
+GPRT_API int gprtGetMouseButton(GPRTContext _context,
+  int button)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  if (!requestedFeatures.window) return GPRT_RELEASE;
+
+  return glfwGetMouseButton(context->window, button);
+}
+
+GPRT_API double gprtGetTime(GPRTContext _context)
+{
+  LOG_API_CALL();
+  Context *context = (Context*)_context;
+  if (!requestedFeatures.window) return 0.0;
+  return glfwGetTime();
+}
+
+GPRT_API void gprtBufferPresent(GPRTContext _context, GPRTBuffer _buffer) {
   LOG_API_CALL();
   if (!requestedFeatures.window) return;
   Context *context = (Context*)_context;
@@ -4215,7 +4253,36 @@ gprtBufferUnmap(GPRTBuffer _buffer, int deviceID)
   buffer->unmap();
 }
 
+GPRT_API void gprtBufferSaveImage(GPRTBuffer _buffer, 
+  uint32_t width, uint32_t height, const char *imageName)
+{
+  LOG_API_CALL();
+  Buffer *buffer = (Buffer*)_buffer;
 
+  // Keep track of whether the buffer was mapped before this call
+  bool mapped = true;
+  if (buffer->mapped == nullptr) mapped = false;
+
+  // If not mapped currently, map it
+  if (!mapped)
+    buffer->map();
+
+  const uint8_t *fb = (const uint8_t*) buffer->mapped;
+  std::vector<uint8_t> swizzled(width*height*4);
+  for (uint32_t pid = 0; pid < width * height; ++pid) {
+    swizzled[pid * 4 + 0] = fb[pid*4 + 2];
+    swizzled[pid * 4 + 1] = fb[pid*4 + 1];
+    swizzled[pid * 4 + 2] = fb[pid*4 + 0];
+    swizzled[pid * 4 + 3] = fb[pid*4 + 3];
+  }
+  
+  stbi_write_png(imageName,width,height,4,
+                 swizzled.data(),(uint32_t)(width)*sizeof(uint32_t));
+  
+  // Return mapped to previous state
+  if (!mapped)
+    buffer->unmap();
+}
 
 GPRT_API void gprtBuildPipeline(GPRTContext _context)
 {
@@ -4677,10 +4744,14 @@ std::pair<size_t, void*> gprtGetVariable(
   auto found = entry->vars.find(std::string(name));
 
   // 1. Figure out if the variable "name" exists 
-  assert(found != entry->vars.end());
+  if (found == entry->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
   
   // 2. Assert the types match 
-  assert(found->second.decl.type == type);
+  if (found->second.decl.type != type) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(type) + " and does not match given type " + getTypeString(type));
+  }
 
   std::pair<size_t, void*> variable;
 
@@ -7895,67 +7966,103 @@ GPRT_API void gprtGeomSet4ulv(GPRTGeom _geom, const char *name, const uint64_t *
 // setters for variables on "Compute"s
 // GPRT_API void gprtComputeSetTexture(GPRTCompute _compute, const char *name, GPRTTexture val) 
 // GPRT_API void gprtComputeSetPointer(GPRTCompute _compute, const char *name, const void *val) 
-GPRT_API void gprtComputeSetBuffer(GPRTCompute _rayGen, const char *name, GPRTBuffer _val)
+GPRT_API void gprtComputeSetBuffer(GPRTCompute _compute, const char *name, GPRTBuffer _val)
 {
   LOG_API_CALL();
-  Compute *raygen = (Compute*)_rayGen;
-  assert(raygen);
+  Compute *compute = (Compute*)_compute;
+  assert(compute);
 
   Buffer *val = (Buffer*)_val;
   assert(val);
 
-  // 1. Figure out if the variable "name" exists (Maybe through a dictionary?)
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
-
+  // 1. Figure out if the variable "name" exists
+  auto found = compute->vars.find(std::string(name));
+  if (found == compute->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
+  
   // The found variable must be a buffer
-  assert(raygen->vars[name].decl.type == GPRT_BUFFER || 
-         raygen->vars[name].decl.type == GPRT_BUFPTR);
+  if (found->second.decl.type != GPRT_BUFFER && found->second.decl.type != GPRT_BUFFER_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_BUFFER) + " or " + getTypeString(GPRT_BUFFER_POINTER));
+  }
 
-  // Buffer pointers are 64 bits
-  size_t size = sizeof(uint64_t);
+  if (compute->vars[name].decl.type == GPRT_BUFFER_POINTER) {
+    // Buffer pointers are 64 bits
+    size_t size = sizeof(uint64_t);
 
-  // 3. Assign the value to that variable
-  VkDeviceAddress addr = val->address;
-  memcpy(raygen->vars[name].data, &addr, size);
+    // 3. Assign the value to that variable
+    VkDeviceAddress addr = val->address;
+    memcpy(compute->vars[name].data, &addr, size);
+  } else {
+    gprt::Buffer buffer;
+    buffer.x = val->address;
+    buffer.y = val->size;
+
+    size_t size = sizeof(uint64_t2);
+
+    // 3. Assign the value to that variable
+    VkDeviceAddress addr = val->address;
+    memcpy(compute->vars[name].data, &buffer, size);
+  }
 }
 
 GPRT_API void gprtComputeSetAccel(GPRTCompute _compute, const char *name, GPRTAccel _val)
 {
   LOG_API_CALL();
-  Compute *raygen = (Compute*)_compute;
-  assert(raygen);
+  Compute *compute = (Compute*)_compute;
+  assert(compute);
 
   Accel *val = (Accel*)_val;
   assert(val);
 
   // 1. Figure out if the variable "name" exists
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
+  auto found = compute->vars.find(std::string(name));
+  if (found == compute->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
   // The found variable must be an acceleration structure
-  assert(raygen->vars[name].decl.type == GPRT_ACCEL);
+  if (found->second.decl.type != GPRT_ACCEL && found->second.decl.type != GPRT_ACCEL_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_ACCEL) + " or " + getTypeString(GPRT_ACCEL_POINTER));
+  }
 
-  // Acceleration structure pointers are 64 bits
-  size_t size = sizeof(uint64_t);
+  if (compute->vars[name].decl.type == GPRT_ACCEL_POINTER) {
+    // Acceleration structure pointers are 64 bits
+    size_t size = sizeof(uint64_t);
 
-  // 3. Assign the value to that variable
-  VkDeviceAddress addr = val->address;
-  memcpy(raygen->vars[name].data, &addr, size);
+    // 3. Assign the value to that variable
+    VkDeviceAddress addr = val->address;
+    memcpy(compute->vars[name].data, &addr, size);
+  } else {
+    gprt::Accel accel;
+    accel.x = val->address;
+    accel.y = 0; // todo
+
+    size_t size = sizeof(uint64_t2);
+
+    // 3. Assign the value to that variable
+    VkDeviceAddress addr = val->address;
+    memcpy(compute->vars[name].data, &accel, size);
+  }
 }
 
 GPRT_API void gprtComputeSetRaw(GPRTCompute _compute, const char *name, const void *val)
 {
   LOG_API_CALL();
-  Compute *raygen = (Compute*)_compute;
-  assert(raygen);
+  Compute *compute = (Compute*)_compute;
+  assert(compute);
 
   // 1. Figure out if the variable "name" exists (Maybe through a dictionary?)
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
-
+  auto found = compute->vars.find(std::string(name));
+  if (found == compute->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
+  
   // 2. Get the expected size for this variable
-  size_t size = getSize(raygen->vars[name].decl.type);
+  size_t size = getSize(compute->vars[name].decl.type);
 
   // 3. Assign the value to that variable
-  memcpy(raygen->vars[name].data, val, size);
+  memcpy(compute->vars[name].data, val, size);
 }
 
 // setters for variables on "RayGen"s
@@ -7970,12 +8077,16 @@ GPRT_API void gprtRayGenSetBuffer(GPRTRayGen _raygen, const char *name, GPRTBuff
   Buffer *val = (Buffer*)_val;
   assert(val);
 
-  // 1. Figure out if the variable "name" exists (Maybe through a dictionary?)
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
-
+  // 1. Figure out if the variable "name" exists
+  auto found = raygen->vars.find(std::string(name));
+  if (found == raygen->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
+  
   // The found variable must be a buffer
-  assert(raygen->vars[name].decl.type == GPRT_BUFFER || 
-         raygen->vars[name].decl.type == GPRT_BUFFER_POINTER);
+  if (found->second.decl.type != GPRT_BUFFER && found->second.decl.type != GPRT_BUFFER_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_BUFFER) + " or " + getTypeString(GPRT_BUFFER_POINTER));
+  }
 
   if (raygen->vars[name].decl.type == GPRT_BUFFER_POINTER) {
     // Buffer pointers are 64 bits
@@ -8007,11 +8118,15 @@ GPRT_API void gprtRayGenSetAccel(GPRTRayGen _raygen, const char *name, GPRTAccel
   assert(val);
 
   // 1. Figure out if the variable "name" exists
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
+  auto found = raygen->vars.find(std::string(name));
+  if (found == raygen->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
   // The found variable must be an acceleration structure
-  assert(raygen->vars[name].decl.type == GPRT_ACCEL ||
-         raygen->vars[name].decl.type == GPRT_ACCEL_POINTER);
+  if (found->second.decl.type != GPRT_ACCEL && found->second.decl.type != GPRT_ACCEL_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_ACCEL) + " or " + getTypeString(GPRT_ACCEL_POINTER));
+  }
 
   if (raygen->vars[name].decl.type == GPRT_ACCEL_POINTER) {
     // Acceleration structure pointers are 64 bits
@@ -8040,8 +8155,11 @@ GPRT_API void gprtRayGenSetRaw(GPRTRayGen _rayGen, const char *name, const void 
   assert(raygen);
 
   // 1. Figure out if the variable "name" exists (Maybe through a dictionary?)
-  assert(raygen->vars.find(std::string(name)) != raygen->vars.end());
-
+  auto found = raygen->vars.find(std::string(name));
+  if (found == raygen->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
+  
   // 2. Get the expected size for this variable
   size_t size = getSize(raygen->vars[name].decl.type);
 
@@ -8062,11 +8180,15 @@ GPRT_API void gprtGeomSetBuffer(GPRTGeom _geom, const char *name, GPRTBuffer _va
   assert(val);
 
   // 1. Figure out if the variable "name" exists
-  assert(geom->vars.find(std::string(name)) != geom->vars.end());
+  auto found = geom->vars.find(std::string(name));
+  if (found == geom->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
   // The found variable must be a buffer
-  assert(geom->vars[name].decl.type == GPRT_BUFFER || 
-         geom->vars[name].decl.type == GPRT_BUFFER_POINTER);
+  if (found->second.decl.type != GPRT_BUFFER && found->second.decl.type != GPRT_BUFFER_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_BUFFER) + " or " + getTypeString(GPRT_BUFFER_POINTER));
+  }
 
   if (geom->vars[name].decl.type == GPRT_BUFFER_POINTER) {
     // Buffer pointers are 64 bits
@@ -8097,12 +8219,16 @@ GPRT_API void gprtGeomSetAccel(GPRTGeom _geom, const char *name, GPRTAccel _val)
   Accel *val = (Accel*)_val;
   assert(val);
 
-  // 1. Figure out if the variable "name" exists
-  assert(geom->vars.find(std::string(name)) != geom->vars.end());
+// 1. Figure out if the variable "name" exists
+  auto found = geom->vars.find(std::string(name));
+  if (found == geom->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
   // The found variable must be an acceleration structure
-  assert(geom->vars[name].decl.type == GPRT_ACCEL ||
-         geom->vars[name].decl.type == GPRT_ACCEL_POINTER);
+  if (found->second.decl.type != GPRT_ACCEL && found->second.decl.type != GPRT_ACCEL_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_ACCEL) + " or " + getTypeString(GPRT_ACCEL_POINTER));
+  }
 
   if (geom->vars[name].decl.type == GPRT_ACCEL_POINTER) {
     // Acceleration structure pointers are 64 bits
@@ -8161,11 +8287,15 @@ GPRT_API void gprtMissSetBuffer(GPRTMiss _miss, const char *name, GPRTBuffer _va
   assert(val);
 
   // 1. Figure out if the variable "name" exists
-  assert(miss->vars.find(std::string(name)) != miss->vars.end());
+  auto found = miss->vars.find(std::string(name));
+  if (found == miss->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
   // The found variable must be a buffer
-  assert(miss->vars[name].decl.type == GPRT_BUFFER || 
-         miss->vars[name].decl.type == GPRT_BUFFER_POINTER);
+  if (found->second.decl.type != GPRT_BUFFER && found->second.decl.type != GPRT_BUFFER_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_BUFFER) + " or " + getTypeString(GPRT_BUFFER_POINTER));
+  }
 
   if (miss->vars[name].decl.type == GPRT_BUFFER_POINTER) {
     // Buffer pointers are 64 bits
@@ -8197,10 +8327,15 @@ GPRT_API void gprtMissSetAccel(GPRTMiss _miss, const char *name, GPRTAccel _val)
   assert(val);
 
   // 1. Figure out if the variable "name" exists
-  assert(miss->vars.find(std::string(name)) != miss->vars.end());
+  auto found = miss->vars.find(std::string(name));
+  if (found == miss->vars.end()) {
+    GPRT_RAISE("Unable to find variable declaration " + std::string(name));
+  }
 
-  assert(miss->vars[name].decl.type == GPRT_ACCEL ||
-         miss->vars[name].decl.type == GPRT_ACCEL_POINTER);
+  // The found variable must be an acceleration structure
+  if (found->second.decl.type != GPRT_ACCEL && found->second.decl.type != GPRT_ACCEL_POINTER) {
+    GPRT_RAISE("Variable " + std::string(name) + " is of type " + getTypeString(found->second.decl.type) + " and does not match given type " + getTypeString(GPRT_ACCEL) + " or " + getTypeString(GPRT_ACCEL_POINTER));
+  }
 
   if (miss->vars[name].decl.type == GPRT_ACCEL_POINTER) {
     // Acceleration structure pointers are 64 bits

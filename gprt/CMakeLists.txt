@@ -32,7 +32,7 @@ embed_devicecode(
   ENTRY_POINTS
     gprtFillInstanceData
   SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/gprt_device_code.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/gprt.hlsl
 )
 
 target_sources(gprt PRIVATE
@@ -65,6 +65,9 @@ target_link_libraries(gprt
     ${Vulkan_LIBRARY}
     gprtDeviceCode
     glfw
+    stb_image
+    Threads::Threads
+    ${OPENGL_gl_LIBRARY}
 )
 
 set_target_properties(gprt PROPERTIES LINKER_LANGUAGE CXX)
