@@ -7,7 +7,7 @@
 #ifndef   INCLUDE_DEVICE_CODE
 #define   INCLUDE_DEVICE_CODE
 // our device-side data structures
-#include "deviceCode.h"
+#include "../deviceCode.h"
 #endif
 
 #include <iostream>

@@ -166,27 +166,27 @@ float3 randomPointInUnitSphere(float2 rand) {
   return p;
 }
 
-ScatterResult scatter(Metal metal, float3 P, float3 N)
-{
-  float3 org   = WorldRayOrigin();
-  float3 dir   = WorldRayDirection();
+// ScatterResult scatter(Metal metal, float3 P, float3 N)
+// {
+//   float3 org   = WorldRayOrigin();
+//   float3 dir   = WorldRayDirection();
 
-  if (dot(N,dir)  > 0.f)
-    N = -N;
-  N = normalize(N);
+//   if (dot(N,dir)  > 0.f)
+//     N = -N;
+//   N = normalize(N);
   
-  ScatterResult result;
-  float3 reflected = reflect(normalize(dir),N);
-  result.scatteredOrigin = P;
-  result.scatteredDirection = (reflected+metal.fuzz*randomPointInUnitSphere(float2(org.x, org.y)));
+//   ScatterResult result;
+//   float3 reflected = reflect(normalize(dir),N);
+//   result.scatteredOrigin = P;
+//   result.scatteredDirection = (reflected+metal.fuzz*randomPointInUnitSphere(float2(org.x, org.y)));
 
-  // float2 random = rand_2_10(float2(org.x, org.y));
-  // result.scatteredDirection = (reflected+metal.fuzz*hack_sampling_hemisphere(1, random, N));
+//   // float2 random = rand_2_10(float2(org.x, org.y));
+//   // result.scatteredDirection = (reflected+metal.fuzz*hack_sampling_hemisphere(1, random, N));
 
-  result.attenuation         = metal.albedo;
-  result.scatterEvent = int(dot(result.scatteredDirection, N) > 0.f);
-  return result;
-}
+//   result.attenuation         = metal.albedo;
+//   result.scatterEvent = int(dot(result.scatteredDirection, N) > 0.f);
+//   return result;
+// }
 
 ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
 {
@@ -214,8 +214,8 @@ ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
-  int total_sample_per_pixel = 100;
-  int ray_depth = 5;
+  int total_sample_per_pixel = 1;
+  int ray_depth = 50;
   uint2 pixelID = DispatchRaysIndex().xy;
   float2 screen = (float2(pixelID) + 
                   float2(.5f, .5f)) / float2(record.fbSize);
@@ -229,7 +229,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       + screen.x * record.camera.dir_du
       + screen.y * record.camera.dir_dv
     );
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 0.01;
     rayDesc.TMax = 10000.0;
     RaytracingAccelerationStructure world = gprt::getAccelHandle(record.world);
 
@@ -249,15 +249,29 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       if (payload.scatterResult.scatterEvent == 2) {
         total_payload_color += payload.color * attenuation;
         break;
-      } else if (payload.scatterResult.scatterEvent == 0) {
-        total_payload_color += float3(0.f, 0.f, 0.f);
-        break;
+      // } else if (payload.scatterResult.scatterEvent == 0) {
+      //   total_payload_color += float3(0.f, 0.f, 0.f);
+      //   break;
       } else {
         attenuation *= payload.scatterResult.attenuation;
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
       }
+      if (i == ray_depth-1) {
+        total_payload_color += float3(1.f, 0.f, 0.f);
+      }
     }
+    // TraceRay(
+    //   world, // the tree
+    //   RAY_FLAG_FORCE_OPAQUE, // ray flags
+    //   0xff, // instance inclusion mask
+    //   0, // ray type
+    //   1, // number of ray types
+    //   0, // miss type
+    //   rayDesc, // the ray to trace
+    //   payload // the payload IO
+    // );
+    // total_payload_color = payload.color;
   }
 
   const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
@@ -305,23 +319,26 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
 
   float3 normal;
   if (
-    gprt::load<float3>(record.normal, index.x).x == 0.f && 
-    gprt::load<float3>(record.normal, index.x).y == 0.f && 
-    gprt::load<float3>(record.normal, index.x).z == 0.f
+    // gprt::load<float3>(record.normal, index.x).x == 0.f && 
+    // gprt::load<float3>(record.normal, index.x).y == 0.f && 
+    // gprt::load<float3>(record.normal, index.x).z == 0.f  
+    true
   ) {
     normal     = normalize(cross(B-A,C-A));
     payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * gprt::load<float3>(record.color, index.x);
-  } else {
-    float3 triangle_barycentrics = get_triangle_barycentrics(rayOrg, A, B, C);
-    normal     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + 
-                 triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + 
-                 triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
-    float3 current_color = gprt::load<float3>(record.color, index.x);
-    payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
+  // } else {
+  //   float3 triangle_barycentrics = get_triangle_barycentrics(rayOrg, A, B, C);
+  //   normal     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + 
+  //                triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + 
+  //                triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
+  //   float3 current_color = gprt::load<float3>(record.color, index.x);
+  //   payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
   }
-
-  Metal metal  = gprt::load<Metal>(record.metal, primID);
-  payload.scatterResult = scatter(metal, targetPoint, normal);
+  
+  // payload.color = abs(normal);
+  
+  // Metal metal  = gprt::load<Metal>(record.metal, primID);
+  // payload.scatterResult = scatter(metal, targetPoint, normal);
 
   Lambertian lambertian  = gprt::load<Lambertian>(record.lambertian, primID);
   payload.scatterResult = scatter(lambertian, targetPoint, normal);
@@ -335,7 +352,7 @@ GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
 {
   // uint2 pixelID = DispatchRaysIndex().xy;  
   // int pattern = (pixelID.x / 8) ^ (pixelID.y/8);
-  // payload.color = (pattern & 1) ? record.color1 : record.color0;
+  // payload.color = record.color1;//(pattern & 1) ? record.color1 : record.color0;
 
   float3 rayDir = WorldRayDirection();
   const float t = 0.5f * (rayDir.y + 1.0f);
