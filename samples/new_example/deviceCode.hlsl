@@ -215,7 +215,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   int total_sample_per_pixel = 1;
-  int ray_depth = 50;
+  int ray_depth = 1;
   uint2 pixelID = DispatchRaysIndex().xy;
   float2 screen = (float2(pixelID) + 
                   float2(.5f, .5f)) / float2(record.fbSize);
@@ -234,44 +234,44 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     RaytracingAccelerationStructure world = gprt::getAccelHandle(record.world);
 
     float3 attenuation = float3(1.f, 1.f, 1.f);
-    for (int i = 0; i < ray_depth; i++) {
-      TraceRay(
-        world, // the tree
-        RAY_FLAG_FORCE_OPAQUE, // ray flags
-        0xff, // instance inclusion mask
-        0, // ray type
-        1, // number of ray types
-        0, // miss type
-        rayDesc, // the ray to trace
-        payload // the payload IO
-      );
+    // for (int i = 0; i < ray_depth; i++) {
+    //   TraceRay(
+    //     world, // the tree
+    //     RAY_FLAG_FORCE_OPAQUE, // ray flags
+    //     0xff, // instance inclusion mask
+    //     0, // ray type
+    //     1, // number of ray types
+    //     0, // miss type
+    //     rayDesc, // the ray to trace
+    //     payload // the payload IO
+    //   );
 
-      if (payload.scatterResult.scatterEvent == 2) {
-        total_payload_color += payload.color * attenuation;
-        break;
-      // } else if (payload.scatterResult.scatterEvent == 0) {
-      //   total_payload_color += float3(0.f, 0.f, 0.f);
-      //   break;
-      } else {
-        attenuation *= payload.scatterResult.attenuation;
-        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
-        rayDesc.Direction = payload.scatterResult.scatteredDirection;
-      }
-      if (i == ray_depth-1) {
-        total_payload_color += float3(1.f, 0.f, 0.f);
-      }
-    }
-    // TraceRay(
-    //   world, // the tree
-    //   RAY_FLAG_FORCE_OPAQUE, // ray flags
-    //   0xff, // instance inclusion mask
-    //   0, // ray type
-    //   1, // number of ray types
-    //   0, // miss type
-    //   rayDesc, // the ray to trace
-    //   payload // the payload IO
-    // );
-    // total_payload_color = payload.color;
+    //   if (payload.scatterResult.scatterEvent == 2) {
+    //     total_payload_color += payload.color * attenuation;
+    //     break;
+    //   // } else if (payload.scatterResult.scatterEvent == 0) {
+    //   //   total_payload_color += float3(0.f, 0.f, 0.f);
+    //   //   break;
+    //   } else {
+    //     attenuation *= payload.scatterResult.attenuation;
+    //     rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+    //     rayDesc.Direction = payload.scatterResult.scatteredDirection;
+    //   }
+    //   if (i == ray_depth-1) {
+    //     total_payload_color += float3(1.f, 0.f, 0.f);
+    //   }
+    // }
+    TraceRay(
+      world, // the tree
+      RAY_FLAG_FORCE_OPAQUE, // ray flags
+      0xff, // instance inclusion mask
+      0, // ray type
+      1, // number of ray types
+      0, // miss type
+      rayDesc, // the ray to trace
+      payload // the payload IO
+    );
+    total_payload_color = payload.color;
   }
 
   const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
@@ -335,7 +335,7 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   //   payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
   }
   
-  // payload.color = abs(normal);
+  payload.color = abs(normal) + index;
   
   // Metal metal  = gprt::load<Metal>(record.metal, primID);
   // payload.scatterResult = scatter(metal, targetPoint, normal);
