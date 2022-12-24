@@ -519,7 +519,7 @@ gprtGeomDestroy(GPRTGeom geometry);
 GPRT_API void gprtTrianglesSetVertices(GPRTGeom triangles,
                                       GPRTBuffer vertices,
                                       size_t count,
-                                      size_t stride GPRT_IF_CPP(=sizeof(float3),
+                                      size_t stride GPRT_IF_CPP(=sizeof(float3)),
                                       size_t offset GPRT_IF_CPP(=0));
 GPRT_API void gprtTrianglesSetVertexNormal(GPRTGeom triangles,
                                           GPRTBuffer _normals,
