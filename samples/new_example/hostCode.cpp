@@ -66,12 +66,15 @@
 
 extern GPRTProgram new_example_deviceCode;
 
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj";
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj";
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj";
-const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj";
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj";
-// const std::string MODEL_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj";
+
+const std::vector<std::string> MODEL_PATH = {
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj"
+};
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
 const int NUM_VERTICES = 8;
@@ -97,6 +100,12 @@ std::vector<Lambertian> list_of_lambertians;
 std::vector<Metal> list_of_metals;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
+std::vector<float4x4> list_of_transform = {
+    translation_matrix(float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f)),
+    translation_matrix(float3(2 * sin(2 * M_PI * .66), 2 * cos(2 * M_PI * .66), 1.5f)),
+    translation_matrix(float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f)),
+    translation_matrix(float3(0.0f, 0.0f, -4.0f))
+};
 
 float transform[3][4] =
     {
@@ -155,18 +164,18 @@ int main(int ac, char **av)
     // triangle mesh
     // ------------------------------------------------------------------
 
-    // GPRTBuffer vertexBuffer
-    //   = gprtHostBufferCreate(context,GPRT_FLOAT3,NUM_VERTICES,vertices);
-    // GPRTBuffer indexBuffer
-    //   = gprtDeviceBufferCreate(context,GPRT_INT3,NUM_INDICES,indices);
-    loadModel(
-        MODEL_PATH,
-        list_of_vertices,
-        list_of_indices,
-        list_of_colors,
-        list_of_vertex_normals,
-        list_of_lambertians,
-        list_of_metals);
+    for (int each_path = 0; each_path < MODEL_PATH.size(); each_path++) {
+        loadModel(
+            MODEL_PATH[each_path],
+            list_of_vertices,
+            list_of_indices,
+            list_of_colors,
+            list_of_vertex_normals,
+            list_of_lambertians,
+            list_of_metals,
+            list_of_transform[each_path]
+        );
+    }
     GPRTBuffer vertexBuffer = gprtHostBufferCreate(context, GPRT_FLOAT3, list_of_vertices.size(), static_cast<const void *>(list_of_vertices.data()));
     GPRTBuffer normalBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
     GPRTBuffer indexBuffer = gprtDeviceBufferCreate(context, GPRT_INT3, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
@@ -174,7 +183,6 @@ int main(int ac, char **av)
     GPRTBuffer lambertianBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_lambertians[0]), list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
     GPRTBuffer metalBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals[0]), list_of_metals.size(), static_cast<const void *>(list_of_metals.data()));
 
-    GPRTBuffer transformBuffer = gprtDeviceBufferCreate(context, GPRT_TRANSFORM, 1, transform);
     GPRTBuffer frameBuffer = gprtHostBufferCreate(context, GPRT_INT, fbSize.x * fbSize.y);
 
     GPRTBuffer accBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, fbSize.x * fbSize.y, nullptr);
@@ -209,7 +217,6 @@ int main(int ac, char **av)
     gprtAccelBuild(context, trianglesAccel);
 
     GPRTAccel world = gprtInstanceAccelCreate(context, 1, &trianglesAccel);
-    gprtInstanceAccelSet3x4Transforms(world, transformBuffer);
     gprtAccelBuild(context, world);
 
     // ##################################################################
@@ -417,7 +424,6 @@ int main(int ac, char **av)
     gprtBufferDestroy(colorBuffer);
     gprtBufferDestroy(frameBuffer);
     gprtBufferDestroy(accBuffer);
-    gprtBufferDestroy(transformBuffer);
     gprtRayGenDestroy(rayGen);
     gprtMissDestroy(miss);
     gprtAccelDestroy(trianglesAccel);
