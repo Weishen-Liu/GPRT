@@ -23,6 +23,8 @@
 #include "./materials/material.hpp"
 #endif
 
+#include "./math/random.h"
+
 struct Vertex
 {
     float3 pos;
@@ -134,22 +136,22 @@ void loadModel(
         }
     }
 
+    owl::common::LCG<4> random;
+    random.init(0, 1);
+    float3 lambertian_color = float3(random(), random(), random());
+    float3 metal_color = float3(random(), random(), random());
+    float metal_fuzz = random();
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
 
         Lambertian lambertian;
-        lambertian.albedo = float3(0.f, 0.f, .25f);
-        // // float2 random = rand_2_10(float2(rayOrg.x, rayOrg.y));
-        // // lambertian.albedo = 0.5f*(1.f+hack_sampling_hemisphere(1, random, normal));
+        lambertian.albedo = lambertian_color;
         list_of_lambertians.push_back(lambertian);
 
         Metal metal;
-        metal.albedo = float3(0.5f, 0.5f, 0.5f);
-        metal.fuzz = 0.5f;
-        // // float2 random = rand_2_10(float2(rayOrg.x, rayOrg.y));
-        // // metal.albedo = 0.5f*(1.f+hack_sampling_hemisphere(1, random, normal));
-        // // metal.fuzz = 0.5f * random.x;
+        metal.albedo = metal_color;
+        metal.fuzz = metal_fuzz;
         list_of_metals.push_back(metal);
 
     }
