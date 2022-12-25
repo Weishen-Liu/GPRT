@@ -81,10 +81,6 @@ struct ScatterResult
 struct Payload
 {
   float3 color;
-  // int find_hit;
-  // float tHit;
-  // float3 rayDir;
-  // float3 rayOrg;
   ScatterResult scatterResult;
 };
 
