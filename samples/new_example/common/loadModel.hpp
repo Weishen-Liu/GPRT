@@ -77,13 +77,14 @@ namespace std {
 }
 
 void loadModel(
-    const std::string MODEL_PATH,
+    const std::string obj_path,
     std::vector<float3>& list_of_vertices,
     std::vector<int3>& list_of_indices,
     std::vector<float3>& list_of_colors,
     std::vector<float3>&list_of_vertex_normals,
     std::vector<Lambertian>&list_of_lambertians,
-    std::vector<Metal>&list_of_metals
+    std::vector<Metal>&list_of_metals,
+    float4x4 transform
 )
 {
     tinyobj::attrib_t attrib;
@@ -91,7 +92,7 @@ void loadModel(
     std::vector<tinyobj::material_t> materials;
     std::string warn, err;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, obj_path.c_str())) {
         throw std::runtime_error(warn + err);
     }
 
@@ -115,7 +116,6 @@ void loadModel(
                 };
             } else {
                 vertex.normal = float3(0.f, 0.f, 0.f);
-
             }
 
             // vertex.texCoord = {
@@ -127,7 +127,10 @@ void loadModel(
 
             if (uniqueVertices.count(vertex) == 0) {
                 uniqueVertices[vertex] = static_cast<uint32_t>(list_of_vertices.size());
-                list_of_vertices.push_back(vertex.pos);
+                float4 p = mul(
+                    transform, float4(vertex.pos[0], vertex.pos[1], vertex.pos[2], 1.0)
+                );
+                list_of_vertices.push_back(p.xyz());
                 list_of_colors.push_back(vertex.color);
                 list_of_vertex_normals.push_back(vertex.normal);
             }
