@@ -12,12 +12,12 @@
 
 #ifndef INCLUDE_ARCBALL
 #define INCLUDE_ARCBALL
-#include "./arcball.cpp"
+#include "./arcball.hpp"
 #endif
 
 #ifndef INCLUDE_CAMERA
 #define INCLUDE_CAMERA
-#include "./camera.cpp"
+#include "./camera.hpp"
 #endif
 
 #define Arcball true

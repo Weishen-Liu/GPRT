@@ -26,13 +26,21 @@
 #include "deviceCode.h"
 #endif
 
-#include "gprt.h"
+#ifndef INCLUDE_GPRT
+#define INCLUDE_GPRT
+// public GPRT API
+#include <gprt.h>
+#endif
 
-// #ifndef   INCLUDE_MATERIAL
-// #define   INCLUDE_MATERIAL
-// #include "./materials/material.hpp"
-// #endif
+#ifndef   INCLUDE_MATERIAL
+#define   INCLUDE_MATERIAL
 #include "./materials/material.hpp"
+#endif
+
+#ifndef   INCLUDE_LIGHTS
+#define   INCLUDE_LIGHTS
+#include "./common/lights.hpp"
+#endif
 
 #ifndef M_PI
 #define M_PI 3.1415926f
@@ -166,18 +174,7 @@ float3 reflect(float3 v, float3 n)
   return v - 2.0f*dot(v, n)*n;
 }
 
-// float3 randomPointInUnitSphere(float2 rand) {
-//   float3 p;
-//   do {
-//     p = 2.0f*rand_3_10(rand) - float3(1, 1, 1);
-//   } while (dot(p,p) >= 1.0f);
-//   return p;
-// }
-
-float3 randomPointInUnitSphere(float2 rand, float3 normal) {
-  // return normal;
-
-  // return hack_sampling_hemisphere(1, rand_2_10(rand), normal);
+float3 random_point_in_unit_sphere(float2 rand) {
 
   return uniform_sample_sphere(0.5, rand_2_10(rand));
 
@@ -188,14 +185,32 @@ float3 randomPointInUnitSphere(float2 rand, float3 normal) {
   // return p;
 }
 
+static float3 russian_roulette(int scatter_index, float3 attenuation)
+{
+  if (scatter_index > 5) {
+    float q = (.05f < attenuation.y) ? 1 - attenuation.y : .05f;
+
+    float2 compare = rand_2_10(float2(attenuation.x, attenuation.y));
+    if (compare.x > compare.y)
+        return float3(0.f, 0.f, 0.f);
+    
+    if(1 == q){
+      attenuation = float3(1.f, 1.f, 1.f);
+    }else{
+      attenuation /= 1 - q;
+    }
+    
+  }
+  return attenuation;
+}
+
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   int total_sample_per_pixel = 10;
   int ray_depth = 50;
   uint2 pixelID = DispatchRaysIndex().xy;
-  float2 screen = (float2(pixelID) + 
-                  float2(.5f, .5f)) / float2(record.fbSize);
+  float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
   for (int each_sample = 0; each_sample < total_sample_per_pixel; each_sample++)
   {
     Payload payload;
@@ -235,6 +250,10 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
       }
+
+      // Possibly terminate the path with Russian roulette
+      attenuation = russian_roulette(i, attenuation);
+      if (attenuation.x == 0.f && attenuation.y == 0.f && attenuation.z == 0.f) break;
     }
   }
 
@@ -248,8 +267,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
 ScatterResult scatter(Metal metal, float3 P, float3 N)
 {
-  float3 org   = WorldRayOrigin();
-  float3 dir   = WorldRayDirection();
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
 
   if (dot(N,dir)  > 0.f)
     N = -N;
@@ -258,7 +277,7 @@ ScatterResult scatter(Metal metal, float3 P, float3 N)
   ScatterResult result;
   float3 reflected = reflect(normalize(dir),N);
   result.scatteredOrigin = P;
-  result.scatteredDirection = (reflected+metal.fuzz*randomPointInUnitSphere(rand_2_10(float2(org.x, org.y)), N));
+  result.scatteredDirection = (reflected+metal.fuzz*random_point_in_unit_sphere(rand_2_10(float2(org.x, org.y))));
 
   result.attenuation         = metal.albedo;
   result.scatterEvent = int(dot(result.scatteredDirection, N) > 0.f);
@@ -267,20 +286,21 @@ ScatterResult scatter(Metal metal, float3 P, float3 N)
 
 ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
 {
-  float3 org   = WorldRayOrigin();
-  float3 dir   = WorldRayDirection();
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
 
   if (dot(N,dir)  > 0.f)
     N = -N;
   N = normalize(N);
 
-  float3 target = P + (N + randomPointInUnitSphere(rand_2_10(float2(org.x, org.y)), N));
+  float3 target = P + (N + random_point_in_unit_sphere(rand_2_10(float2(org.x, org.y))));
   // return scattering event
   ScatterResult result;
   result.scatteredOrigin     = P;
   result.scatteredDirection  = (target-P);
   result.attenuation         = lambertian.albedo;
   result.scatterEvent        = 1;
+  result.normal              = N;
   return result;
 }
 

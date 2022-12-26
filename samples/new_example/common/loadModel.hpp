@@ -18,6 +18,11 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#ifndef   INCLUDE_LIGHTS
+#define   INCLUDE_LIGHTS
+#include "./common/lights.hpp"
+#endif
+
 #ifndef   INCLUDE_MATERIAL
 #define   INCLUDE_MATERIAL
 #include "./materials/material.hpp"
@@ -158,4 +163,11 @@ void loadModel(
         list_of_metals.push_back(metal);
 
     }
+}
+
+void loadLights(std::vector<AmbientLight>& list_of_ambient_lights)
+{
+    AmbientLight ambientLight;
+    ambientLight.setIntensity(float3(1.f, 1.f, 1.f));
+    list_of_ambient_lights.push_back(ambientLight);
 }
