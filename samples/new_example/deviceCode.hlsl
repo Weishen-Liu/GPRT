@@ -180,6 +180,12 @@ float3 randomPointInUnitSphere(float2 rand, float3 normal) {
   // return hack_sampling_hemisphere(1, rand_2_10(rand), normal);
 
   return uniform_sample_sphere(0.5, rand_2_10(rand));
+
+  // float3 p;
+  // do {
+  //   p = 2.0f*rand_3_10(rand) - float3(1, 1, 1);
+  // } while (dot(p,p) >= 1.0f);
+  // return p;
 }
 
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
@@ -229,21 +235,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
       }
-      // if (i == ray_depth-1) {
-      //   total_payload_color += float3(1.f, 0.f, 0.f);
-      // }
     }
-    // TraceRay(
-    //   world, // the tree
-    //   RAY_FLAG_FORCE_OPAQUE, // ray flags
-    //   0xff, // instance inclusion mask
-    //   0, // ray type
-    //   1, // number of ray types
-    //   0, // miss type
-    //   rayDesc, // the ray to trace
-    //   payload // the payload IO
-    // );
-    // total_payload_color = payload.color;
   }
 
   const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
@@ -316,8 +308,8 @@ float3 get_triangle_barycentrics(float3 P, float3 A, float3 B, float3 C)
 GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
   uint   primID = PrimitiveIndex();
-  float3 rayOrg = WorldRayOrigin();
-  float3 rayDir = WorldRayDirection();
+  float3 rayOrg = ObjectRayOrigin();
+  float3 rayDir = ObjectRayDirection();
   float  tHit   = RayTCurrent();
   float3 targetPoint = rayOrg + rayDir * tHit;
 
@@ -326,32 +318,35 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   float3 A      = gprt::load<float3>(record.vertex, index.x);
   float3 B      = gprt::load<float3>(record.vertex, index.y);
   float3 C      = gprt::load<float3>(record.vertex, index.z);
+  float3 n_A      = gprt::load<float3>(record.normal, index.x);
+  float3 n_B      = gprt::load<float3>(record.normal, index.y);
+  float3 n_C      = gprt::load<float3>(record.normal, index.z);
 
   float3 normal;
-  normal     = normalize(cross(B-A,C-A));
-  // if (
-  //   gprt::load<float3>(record.normal, index.x).x == 0.f && 
-  //   gprt::load<float3>(record.normal, index.x).y == 0.f && 
-  //   gprt::load<float3>(record.normal, index.x).z == 0.f  
-  // ) {
-  //   normal     = normalize(cross(B-A,C-A));
-  //   payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * gprt::load<float3>(record.color, index.x);
-  // } else {
-  //   float3 triangle_barycentrics = get_triangle_barycentrics(rayOrg, A, B, C);
-  //   normal     = triangle_barycentrics.z * gprt::load<float3>(record.normal, index.x) + 
-  //                triangle_barycentrics.x * gprt::load<float3>(record.normal, index.y) + 
-  //                triangle_barycentrics.y * gprt::load<float3>(record.normal, index.z);
-  //   float3 current_color = gprt::load<float3>(record.color, index.x);
-  //   payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
-  // }
+
+  if (
+    n_A.x == 0.f && n_A.y == 0.f && n_A.z == 0.f &&
+    n_B.x == 0.f && n_B.y == 0.f && n_B.z == 0.f &&
+    n_C.x == 0.f && n_C.y == 0.f && n_C.z == 0.f
+  ) {
+    normal     = normalize(cross(B-A,C-A));
+    // payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * gprt::load<float3>(record.color, index.x);
+  } else {
+    float3 triangle_barycentrics = get_triangle_barycentrics(targetPoint, A, B, C);
+    normal     = triangle_barycentrics.z * n_A + 
+                 triangle_barycentrics.x * n_B + 
+                 triangle_barycentrics.y * n_C;
+    // float3 current_color = gprt::load<float3>(record.color, index.x);
+    // payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
+  }
 
   // payload.color = abs(normal);
   
-  Metal metal  = gprt::load<Metal>(record.metal, primID);
-  payload.scatterResult = scatter(metal, targetPoint, normal);
+  // Metal metal  = gprt::load<Metal>(record.metal, primID);
+  // payload.scatterResult = scatter(metal, targetPoint, normal);
 
-  // Lambertian lambertian = gprt::load<Lambertian>(record.lambertian, primID);
-  // payload.scatterResult = scatter(lambertian, targetPoint, normal);
+  Lambertian lambertian = gprt::load<Lambertian>(record.lambertian, primID);
+  payload.scatterResult = scatter(lambertian, targetPoint, normal);
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
