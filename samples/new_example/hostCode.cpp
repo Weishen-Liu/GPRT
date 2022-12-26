@@ -58,6 +58,11 @@
 #include "./common/loadModel.hpp"
 #include "./common/loadTexture.hpp"
 
+#ifndef   INCLUDE_LIGHTS
+#define   INCLUDE_LIGHTS
+#include "./common/lights.hpp"
+#endif
+
 #ifndef INCLUDE_MATERIAL
 #define INCLUDE_MATERIAL
 #include "./materials/material.hpp"
@@ -68,13 +73,13 @@ extern GPRTProgram new_example_deviceCode;
 
 
 const std::vector<std::string> MODEL_PATH = {
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
-    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
-    "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"
 };
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
@@ -95,10 +100,9 @@ int3 indices[NUM_INDICES] =
     {
         {0, 1, 3}, {2, 3, 0}, {5, 7, 6}, {5, 6, 4}, {0, 4, 5}, {0, 5, 1}, {2, 3, 7}, {2, 7, 6}, {1, 5, 7}, {1, 7, 3}, {4, 0, 2}, {4, 2, 6}};
 
-std::vector<float3> list_of_vertices;
+// Geometry
 std::vector<int3> list_of_indices;
-std::vector<Lambertian> list_of_lambertians;
-std::vector<Metal> list_of_metals;
+std::vector<float3> list_of_vertices;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
 std::vector<float4x4> list_of_transform = {
@@ -107,6 +111,13 @@ std::vector<float4x4> list_of_transform = {
     translation_matrix(float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f)),
     translation_matrix(float3(0.0f, 0.0f, -4.0f))
 };
+
+// Lights
+std::vector<AmbientLight> list_of_ambient_lights;
+
+// Materials
+std::vector<Lambertian> list_of_lambertians;
+std::vector<Metal> list_of_metals;
 
 float transform[3][4] =
     {
@@ -183,11 +194,8 @@ int main(int ac, char **av)
     GPRTBuffer colorBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
     GPRTBuffer lambertianBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_lambertians[0]), list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
     GPRTBuffer metalBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals[0]), list_of_metals.size(), static_cast<const void *>(list_of_metals.data()));
-
     GPRTBuffer frameBuffer = gprtHostBufferCreate(context, GPRT_INT, fbSize.x * fbSize.y);
-
     GPRTBuffer accBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, fbSize.x * fbSize.y, nullptr);
-
     GPRTGeom trianglesGeom = gprtGeomCreate(context, trianglesGeomType);
 
     gprtTrianglesSetVertices(trianglesGeom, vertexBuffer,
@@ -206,7 +214,6 @@ int main(int ac, char **av)
     gprtGeomSetBuffer(trianglesGeom, "vertex", vertexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "normal", normalBuffer);
     gprtGeomSetBuffer(trianglesGeom, "index", indexBuffer);
-    // gprtGeomSet3f(trianglesGeom,"color",0,1,0);
     gprtGeomSetBuffer(trianglesGeom, "color", colorBuffer);
     gprtGeomSetBuffer(trianglesGeom, "metal", metalBuffer);
     gprtGeomSetBuffer(trianglesGeom, "lambertian", lambertianBuffer);
@@ -253,6 +260,8 @@ int main(int ac, char **av)
         {"camera.dir_00", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_00)},
         {"camera.dir_du", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_du)},
         {"camera.dir_dv", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_dv)},
+        {"ambient_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, ambient_lights)},
+        {"ambient_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, ambient_light_size)},
         {/* sentinel to mark end of list */}};
 
     // ----------- create camera  ----------------------------
@@ -266,6 +275,11 @@ int main(int ac, char **av)
     GPRTRayGen rayGen = gprtRayGenCreate(context, module, "simpleRayGen",
                                          sizeof(RayGenData),
                                          rayGenVars, -1);
+    // ----------- create lights  ----------------------------
+    loadLights(list_of_ambient_lights);
+    GPRTBuffer ambientLightBuffer = gprtDeviceBufferCreate(
+        context, GPRT_USER_TYPE(list_of_ambient_lights[0]), list_of_ambient_lights.size(), static_cast<const void *>(list_of_ambient_lights.data())
+    );
 
     // ----------- set variables  ----------------------------
     gprtRayGenSetBuffer(rayGen, "accBuffer", accBuffer);
@@ -273,6 +287,8 @@ int main(int ac, char **av)
     gprtRayGenSetBuffer(rayGen, "fbPtr", frameBuffer);
     gprtRayGenSet2iv(rayGen, "fbSize", (int32_t *)&fbSize);
     gprtRayGenSetAccel(rayGen, "world", world);
+    gprtRayGenSetBuffer(rayGen, "ambient_lights", ambientLightBuffer);
+    gprtRayGenSet1i(rayGen, "ambient_light_size", (uint64_t)list_of_ambient_lights.size());
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -417,6 +433,7 @@ int main(int ac, char **av)
     glfwDestroyWindow(window);
     glfwTerminate();
 
+    gprtBufferDestroy(ambientLightBuffer);
     gprtBufferDestroy(vertexBuffer);
     gprtBufferDestroy(normalBuffer);
     gprtBufferDestroy(indexBuffer);

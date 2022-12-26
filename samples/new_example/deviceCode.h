@@ -20,7 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "gprt.h"
+#ifndef INCLUDE_GPRT
+#define INCLUDE_GPRT
+// public GPRT API
+#include <gprt.h>
+#endif
 
 /* variables available to all programs */
 
@@ -28,59 +32,62 @@
 /* variables for the triangle mesh geometry */
 struct TrianglesGeomData
 {
-  /*! array/buffer of vertex indices */
-  alignas(16) gprt::Buffer index; // vec3i*
-  /*! array/buffer of vertex positions */
-  alignas(16) gprt::Buffer vertex; // vec3f *  
-  /*! array/buffer of vertex normal */
-  alignas(16) gprt::Buffer normal; // vec3f * 
+    /*! array/buffer of vertex indices */
+    alignas(16) gprt::Buffer index; // vec3i*
+    /*! array/buffer of vertex positions */
+    alignas(16) gprt::Buffer vertex; // vec3f *
+    /*! array/buffer of vertex normal */
+    alignas(16) gprt::Buffer normal; // vec3f *
 
-  // /*! base color we use for the entire mesh */
-  // alignas(16) float3 color;
-  /*! array/buffer of color */
-  alignas(16) gprt::Buffer color; // vec3f * 
+    // /*! base color we use for the entire mesh */
+    // alignas(16) float3 color;
+    /*! array/buffer of color */
+    alignas(16) gprt::Buffer color; // vec3f *
 
-  alignas(16) gprt::Buffer lambertian; // vec3f *  
-  alignas(16) gprt::Buffer metal; // vec3f *  
-
+    alignas(16) gprt::Buffer lambertian; // vec3f *
+    alignas(16) gprt::Buffer metal;      // vec3f *
 };
 
 struct RayGenData
 {
-  alignas(16) gprt::Buffer accBuffer;
-  alignas(16) int  accId;
+    alignas(16) gprt::Buffer accBuffer;
+    alignas(16) int accId;
 
-  alignas(16) gprt::Buffer fbPtr;
+    alignas(16) gprt::Buffer fbPtr;
 
-  alignas(8) int2 fbSize;
-  alignas(16) gprt::Accel world;
+    alignas(8) int2 fbSize;
+    alignas(16) gprt::Accel world;
 
-  struct { 
-    alignas(16) float3 pos;   
-    alignas(16) float3 dir_00;
-    alignas(16) float3 dir_du;
-    alignas(16) float3 dir_dv;
-  } camera;
+    alignas(16) gprt::Buffer ambient_lights;
+    alignas(16) int ambient_light_size;
+
+    struct
+    {
+        alignas(16) float3 pos;
+        alignas(16) float3 dir_00;
+        alignas(16) float3 dir_du;
+        alignas(16) float3 dir_dv;
+    } camera;
 };
 
 /* variables for the miss program */
 struct MissProgData
 {
-  alignas(16) float3  color0;
-  alignas(16) float3  color1;
+    alignas(16) float3 color0;
+    alignas(16) float3 color1;
 };
 
 struct ScatterResult
 {
-  int scatterEvent;
-  float3 scatteredOrigin;
-  float3 scatteredDirection;
-  float3 attenuation;
+    int scatterEvent;
+    float3 scatteredOrigin;
+    float3 scatteredDirection;
+    float3 attenuation;
+    float3 normal;
 };
 
 struct Payload
 {
-  float3 color;
-  ScatterResult scatterResult;
+    float3 color;
+    ScatterResult scatterResult;
 };
-
