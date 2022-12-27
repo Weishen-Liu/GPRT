@@ -61,6 +61,9 @@ struct RayGenData
     alignas(16) gprt::Buffer ambient_lights;
     alignas(16) int ambient_light_size;
 
+    alignas(16) gprt::Buffer directional_lights;
+    alignas(16) int directional_light_size;
+
     struct
     {
         alignas(16) float3 pos;
