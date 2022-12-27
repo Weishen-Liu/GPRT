@@ -114,6 +114,7 @@ std::vector<float4x4> list_of_transform = {
 
 // Lights
 std::vector<AmbientLight> list_of_ambient_lights;
+std::vector<DirectionalLight> list_of_directional_lights;
 
 // Materials
 std::vector<Lambertian> list_of_lambertians;
@@ -262,6 +263,8 @@ int main(int ac, char **av)
         {"camera.dir_dv", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_dv)},
         {"ambient_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, ambient_lights)},
         {"ambient_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, ambient_light_size)},
+        {"directional_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights)},
+        {"directional_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, directional_light_size)},
         {/* sentinel to mark end of list */}};
 
     // ----------- create camera  ----------------------------
@@ -276,9 +279,15 @@ int main(int ac, char **av)
                                          sizeof(RayGenData),
                                          rayGenVars, -1);
     // ----------- create lights  ----------------------------
-    loadLights(list_of_ambient_lights);
+    loadLights(
+        list_of_ambient_lights,
+        list_of_directional_lights
+    );
     GPRTBuffer ambientLightBuffer = gprtDeviceBufferCreate(
         context, GPRT_USER_TYPE(list_of_ambient_lights[0]), list_of_ambient_lights.size(), static_cast<const void *>(list_of_ambient_lights.data())
+    );
+    GPRTBuffer directionalLightBuffer = gprtDeviceBufferCreate(
+        context, GPRT_USER_TYPE(list_of_directional_lights[0]), list_of_directional_lights.size(), static_cast<const void *>(list_of_directional_lights.data())
     );
 
     // ----------- set variables  ----------------------------
@@ -289,6 +298,8 @@ int main(int ac, char **av)
     gprtRayGenSetAccel(rayGen, "world", world);
     gprtRayGenSetBuffer(rayGen, "ambient_lights", ambientLightBuffer);
     gprtRayGenSet1i(rayGen, "ambient_light_size", (uint64_t)list_of_ambient_lights.size());
+    gprtRayGenSetBuffer(rayGen, "directional_lights", directionalLightBuffer);
+    gprtRayGenSet1i(rayGen, "directional_light_size", (uint64_t)list_of_directional_lights.size());
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -434,6 +445,7 @@ int main(int ac, char **av)
     glfwTerminate();
 
     gprtBufferDestroy(ambientLightBuffer);
+    gprtBufferDestroy(directionalLightBuffer);
     gprtBufferDestroy(vertexBuffer);
     gprtBufferDestroy(normalBuffer);
     gprtBufferDestroy(indexBuffer);
