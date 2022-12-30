@@ -21,3 +21,7 @@ struct Metal
   float fuzz;
 };
 
+struct Dielectric
+{
+  float ref_idx;
+};

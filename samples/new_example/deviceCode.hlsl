@@ -169,11 +169,6 @@ float3 hack_sampling_hemisphere(float radius, float2 s, float3 normal)
   return sample_dir;
 }
 
-float3 reflect(float3 v, float3 n)
-{
-  return v - 2.0f*dot(v, n)*n;
-}
-
 float3 random_point_in_unit_sphere(float2 rand) {
 
   return uniform_sample_sphere(0.5, rand_2_10(rand));
@@ -241,6 +236,11 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
       if (payload.scatterResult.scatterEvent == 2) {
         total_payload_color += payload.color * attenuation;
+        // if (i > 0) {
+        //   total_payload_color += payload.color * attenuation;
+        //   AmbientLight lambertian = gprt::load<AmbientLight>(record.ambient_lights, 0);
+        //   total_payload_color += lambertian.intensity * attenuation;
+        // }
         break;
       } else if (payload.scatterResult.scatterEvent == 0) {
         total_payload_color += float3(0.f, 0.f, 0.f);
@@ -263,6 +263,11 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
   }
   gprt::store(record.accBuffer, fbOfs, total_payload_color);
   gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * total_sample_per_pixel))));
+}
+
+float3 reflect(float3 v, float3 n)
+{
+  return v - 2.0f*dot(v, n)*n;
 }
 
 ScatterResult scatter(Metal metal, float3 P, float3 N)
@@ -299,6 +304,73 @@ ScatterResult scatter(Lambertian lambertian, float3 P, float3 N)
   result.scatteredOrigin     = P;
   result.scatteredDirection  = (target-P);
   result.attenuation         = lambertian.albedo;
+  result.scatterEvent        = 1;
+  result.normal              = N;
+  return result;
+}
+
+bool refract(float3 v,
+             float3 n,
+             float ni_over_nt,
+             float3 refracted)
+{
+  float3 uv = normalize(v);
+  float dt = dot(uv, n);
+  float discriminant = 1.0f - ni_over_nt * ni_over_nt*(1 - dt * dt);
+  if (discriminant > 0.f) {
+    refracted = ni_over_nt * (uv - n * dt) - n * sqrt(discriminant);
+    return true;
+  }
+  else
+    return false;
+}
+
+float schlick(float cosine, float ref_idx)
+{
+  float r0 = (1.0f - ref_idx) / (1.0f + ref_idx);
+  r0 = r0 * r0;
+  return r0 + (1.0f - r0)*pow((1.0f - cosine), 5.0f);
+}
+
+ScatterResult scatter(Dielectric dielectric, float3 P, float3 N)
+{
+  ScatterResult result;
+
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
+
+  N = normalize(N);
+  float3 outward_normal;
+  float3 reflected = reflect(dir,N);
+  float ni_over_nt;
+  result.attenuation = float3(1.f, 1.f, 1.f); 
+  float3 refracted;
+  float reflect_prob;
+  float cosine;
+  
+  if (dot(dir,N) > 0.f) {
+    outward_normal = -N;
+    ni_over_nt = dielectric.ref_idx;
+    cosine = dot(dir, N);// / vec3f(dir).length();
+    cosine = sqrt(1.f - dielectric.ref_idx*dielectric.ref_idx*(1.f-cosine*cosine));
+  }
+  else {
+    outward_normal = N;
+    ni_over_nt = 1.0 / dielectric.ref_idx;
+    cosine = -dot(dir, N);// / vec3f(dir).length();
+  }
+  if (refract(dir, outward_normal, ni_over_nt, refracted)) 
+    reflect_prob = schlick(cosine, dielectric.ref_idx);
+  else 
+    reflect_prob = 1.f;
+
+  result.scatteredOrigin = P;
+  if (rand_2_10(float2(org.x, org.y)).x < reflect_prob) 
+    result.scatteredDirection = reflected;
+  else 
+    result.scatteredDirection = refracted;
+  
+  // return scattering event
   result.scatterEvent        = 1;
   result.normal              = N;
   return result;
@@ -367,6 +439,9 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
 
   Lambertian lambertian = gprt::load<Lambertian>(record.lambertian, primID);
   payload.scatterResult = scatter(lambertian, targetPoint, normal);
+
+  // Dielectric dielectric = gprt::load<Dielectric>(record.dielectric, primID);
+  // payload.scatterResult = scatter(dielectric, targetPoint, normal);
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
