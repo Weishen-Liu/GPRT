@@ -199,11 +199,45 @@ static float3 russian_roulette(int scatter_index, float3 attenuation)
   return attenuation;
 }
 
+float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record, ScatterResult lastScatterResult, float3 attenuation) {
+  float3 total_lights_color = float3(0.f, 0.f, 0.f);
+
+  for (int each_light = 0; each_light < record.ambient_light_size; each_light++) {
+    AmbientLight ambientLight = gprt::load<AmbientLight>(record.ambient_lights, each_light);
+    total_lights_color += ambientLight.intensity * attenuation;
+  }
+
+  // Payload payload;
+  // RayDesc rayDesc;
+  // rayDesc.TMin = 1e-3f;
+  // rayDesc.TMax = 1e10f;
+  // for (int each_light = 0; each_light < record.directional_light_size; each_light++) {
+  //   DirectionalLight directionalLight = gprt::load<DirectionalLight>(record.directional_lights, each_light);
+  //   rayDesc.Origin = lastScatterResult.scatteredOrigin;
+  //   rayDesc.Direction = -directionalLight.direction;
+  //   TraceRay(
+  //     world, // the tree
+  //     RAY_FLAG_FORCE_OPAQUE, // ray flags
+  //     0xff, // instance inclusion mask
+  //     0, // ray type
+  //     1, // number of ray types
+  //     0, // miss type
+  //     rayDesc, // the ray to trace
+  //     payload // the payload IO
+  //   );
+  //   if (payload.scatterResult.scatterEvent == 2) {
+  //     total_lights_color += directionalLight.intensity * attenuation;
+  //   }
+  // }
+
+  return total_lights_color;
+}
+
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   int total_sample_per_pixel = 10;
-  int ray_depth = 50;
+  int ray_depth = 10;
   uint2 pixelID = DispatchRaysIndex().xy;
   float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
   for (int each_sample = 0; each_sample < total_sample_per_pixel; each_sample++)
@@ -222,6 +256,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     RaytracingAccelerationStructure world = gprt::getAccelHandle(record.world);
 
     float3 attenuation = float3(1.f, 1.f, 1.f);
+    ScatterResult lastScatterResult;
     for (int i = 0; i < ray_depth; i++) {
       TraceRay(
         world, // the tree
@@ -235,12 +270,11 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       );
 
       if (payload.scatterResult.scatterEvent == 2) {
-        total_payload_color += payload.color * attenuation;
-        // if (i > 0) {
-        //   total_payload_color += payload.color * attenuation;
-        //   AmbientLight lambertian = gprt::load<AmbientLight>(record.ambient_lights, 0);
-        //   total_payload_color += lambertian.intensity * attenuation;
-        // }
+        // total_payload_color += payload.color * attenuation;
+        if (i > 0) {
+          total_payload_color += payload.color * attenuation;
+          total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+        }
         break;
       } else if (payload.scatterResult.scatterEvent == 0) {
         total_payload_color += float3(0.f, 0.f, 0.f);
@@ -249,6 +283,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         attenuation *= payload.scatterResult.attenuation;
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
+        lastScatterResult = payload.scatterResult;
       }
 
       // Possibly terminate the path with Russian roulette
@@ -422,17 +457,12 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
     n_C.x == 0.f && n_C.y == 0.f && n_C.z == 0.f
   ) {
     normal     = normalize(cross(B-A,C-A));
-    // payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * gprt::load<float3>(record.color, index.x);
   } else {
     float3 triangle_barycentrics = get_triangle_barycentrics(targetPoint, A, B, C);
     normal     = triangle_barycentrics.z * n_A + 
                  triangle_barycentrics.x * n_B + 
                  triangle_barycentrics.y * n_C;
-    // float3 current_color = gprt::load<float3>(record.color, index.x);
-    // payload.color = (.2f + .8f * abs(dot(rayDir,normal))) * current_color;
   }
-
-  // payload.color = abs(normal);
   
   // Metal metal  = gprt::load<Metal>(record.metal, primID);
   // payload.scatterResult = scatter(metal, targetPoint, normal);

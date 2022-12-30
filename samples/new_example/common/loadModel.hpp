@@ -181,6 +181,6 @@ void loadLights(
 
     DirectionalLight directionalLight;
     directionalLight.setIntensity(float3(1.f, 1.f, 1.f));
-    directionalLight.setDirection(float3(0.f, -1.f, 0.f));
+    directionalLight.setDirection(normalize(float3(0.f, 12.f, 0.f)));
     list_of_directional_lights.push_back(directionalLight);
 }
