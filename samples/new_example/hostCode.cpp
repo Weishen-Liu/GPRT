@@ -73,11 +73,11 @@ extern GPRTProgram new_example_deviceCode;
 
 
 const std::vector<std::string> MODEL_PATH = {
-    "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"
 };
@@ -106,6 +106,8 @@ std::vector<float3> list_of_vertices;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
 std::vector<float4x4> list_of_transform = {
+    translation_matrix(float3(0.0f, 0.0f, 0.0f)),
+    translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .66), 2 * cos(2 * M_PI * .66), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f)),
@@ -119,6 +121,7 @@ std::vector<DirectionalLight> list_of_directional_lights;
 // Materials
 std::vector<Lambertian> list_of_lambertians;
 std::vector<Metal> list_of_metals;
+std::vector<Dielectric> list_of_dielectrics;
 
 float transform[3][4] =
     {
@@ -131,7 +134,7 @@ const int2 fbSize = {800, 600};
 uint64_t accId = 0;
 GLuint fbTexture{0};
 
-float3 lookFrom = {13.f, 2.f, 3.f};
+float3 lookFrom = {13.f, 0.f, 0.f};
 float3 lookAt = {0.f, 0.f, 0.f};
 float3 lookUp = {0.f, 1.f, 0.f};
 float cosFovy = 20.f;
@@ -159,6 +162,7 @@ int main(int ac, char **av)
         {"normal", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, normal)},
         {"metal", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal)},
         {"lambertian", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, lambertian)},
+        {"dielectric", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, dielectric)},
         {/* sentinel to mark end of list */}};
     GPRTGeomType trianglesGeomType = gprtGeomTypeCreate(context,
                                                         GPRT_TRIANGLES,
@@ -186,6 +190,7 @@ int main(int ac, char **av)
             list_of_vertex_normals,
             list_of_lambertians,
             list_of_metals,
+            list_of_dielectrics,
             list_of_transform[each_path]
         );
     }
@@ -195,6 +200,7 @@ int main(int ac, char **av)
     GPRTBuffer colorBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
     GPRTBuffer lambertianBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_lambertians[0]), list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
     GPRTBuffer metalBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals[0]), list_of_metals.size(), static_cast<const void *>(list_of_metals.data()));
+    GPRTBuffer dielectricBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_dielectrics[0]), list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
     GPRTBuffer frameBuffer = gprtHostBufferCreate(context, GPRT_INT, fbSize.x * fbSize.y);
     GPRTBuffer accBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, fbSize.x * fbSize.y, nullptr);
     GPRTGeom trianglesGeom = gprtGeomCreate(context, trianglesGeomType);
@@ -211,6 +217,8 @@ int main(int ac, char **av)
                                list_of_lambertians.size(), sizeof(Lambertian), 0);
     gprtTrianglesSetMetal(trianglesGeom, metalBuffer,
                           list_of_metals.size(), sizeof(Metal), 0);
+    gprtTrianglesSetDielectric(trianglesGeom, dielectricBuffer,
+                          list_of_dielectrics.size(), sizeof(Metal), 0);
 
     gprtGeomSetBuffer(trianglesGeom, "vertex", vertexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "normal", normalBuffer);
@@ -218,6 +226,7 @@ int main(int ac, char **av)
     gprtGeomSetBuffer(trianglesGeom, "color", colorBuffer);
     gprtGeomSetBuffer(trianglesGeom, "metal", metalBuffer);
     gprtGeomSetBuffer(trianglesGeom, "lambertian", lambertianBuffer);
+    gprtGeomSetBuffer(trianglesGeom, "dielectric", dielectricBuffer);
 
     // ------------------------------------------------------------------
     // the group/accel for that mesh
@@ -451,6 +460,7 @@ int main(int ac, char **av)
     gprtBufferDestroy(indexBuffer);
     gprtBufferDestroy(metalBuffer);
     gprtBufferDestroy(lambertianBuffer);
+    gprtBufferDestroy(dielectricBuffer);
     gprtBufferDestroy(colorBuffer);
     gprtBufferDestroy(frameBuffer);
     gprtBufferDestroy(accBuffer);

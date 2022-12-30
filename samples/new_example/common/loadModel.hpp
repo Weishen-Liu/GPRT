@@ -89,6 +89,7 @@ void loadModel(
     std::vector<float3>&list_of_vertex_normals,
     std::vector<Lambertian>&list_of_lambertians,
     std::vector<Metal>&list_of_metals,
+    std::vector<Dielectric>&list_of_dielectrics,
     float4x4 transform
 )
 {
@@ -149,6 +150,7 @@ void loadModel(
     float3 lambertian_color = float3(random(), random(), random());
     float3 metal_color = float3(random(), random(), random());
     float metal_fuzz = random();
+    float dielectric_ref_idx = random();
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
@@ -162,6 +164,9 @@ void loadModel(
         metal.fuzz = metal_fuzz;
         list_of_metals.push_back(metal);
 
+        Dielectric dielectric;
+        dielectric.ref_idx = dielectric_ref_idx;
+        list_of_dielectrics.push_back(dielectric);
     }
 }
 

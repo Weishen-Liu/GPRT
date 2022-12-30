@@ -561,6 +561,11 @@ GPRT_API void gprtTrianglesSetLambertian(GPRTGeom triangles,
                                      size_t count,
                                      size_t stride,
                                      size_t offset);
+GPRT_API void gprtTrianglesSetDielectric(GPRTGeom triangles,
+                                     GPRTBuffer dielectric,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset);
 
 /*! set the aabb positions (minX, minY, minZ, maxX, maxY, maxZ) 
   for the given AABB geometry. This _has_ to be set before the accel(s) 

@@ -46,6 +46,7 @@ struct TrianglesGeomData
 
     alignas(16) gprt::Buffer lambertian; // vec3f *
     alignas(16) gprt::Buffer metal;      // vec3f *
+    alignas(16) gprt::Buffer dielectric;      // vec3f *
 };
 
 struct RayGenData

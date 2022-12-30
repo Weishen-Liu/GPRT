@@ -958,6 +958,14 @@ struct TriangleGeom : public Geom {
   } metal;
 
   struct {
+    size_t count  = 0; // number of material
+    size_t stride = 0; // stride between material
+    size_t offset = 0; // offset in bytes to the first index
+    size_t firstVertex = 0; // added to the index values before fetching vertices
+    Buffer* buffer = nullptr;
+  } dielectric;
+
+  struct {
     size_t count  = 0; // number of vertices
     size_t stride = 0; // stride between vertices
     size_t offset = 0; // an offset in bytes to the first vertex
@@ -1064,6 +1072,18 @@ struct TriangleGeom : public Geom {
     metal.count = count;
     metal.stride = stride;
     metal.offset = offset;
+  }
+
+  void setDielectric(
+    Buffer* dielectrics,
+    size_t count,
+    size_t stride,
+    size_t offset) 
+  {
+    dielectric.buffer = dielectrics;
+    dielectric.count = count;
+    dielectric.stride = stride;
+    dielectric.offset = offset;
   }
 };
 
@@ -3899,6 +3919,19 @@ GPRT_API void gprtTrianglesSetLambertian(GPRTGeom _triangles,
   Buffer *lambertians = (Buffer*)_lambertians;
   triangles->setLambertian(lambertians, count, stride, offset);
   LOG("Setting triangle lambertian...");
+}
+
+GPRT_API void gprtTrianglesSetDielectric(GPRTGeom _triangles,
+                                     GPRTBuffer _dielectric,
+                                     size_t count,
+                                     size_t stride,
+                                     size_t offset)
+{
+  LOG_API_CALL();
+  TriangleGeom *triangles = (TriangleGeom*)_triangles;
+  Buffer *dielectrics = (Buffer*)_dielectric;
+  triangles->setDielectric(dielectrics, count, stride, offset);
+  LOG("Setting triangle dielectric...");
 }
 
 void gprtAABBsSetPositions(GPRTGeom _aabbs, 
