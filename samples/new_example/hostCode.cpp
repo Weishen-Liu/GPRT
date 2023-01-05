@@ -73,10 +73,10 @@ extern GPRTProgram new_example_deviceCode;
 
 
 const std::vector<std::string> MODEL_PATH = {
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
-    "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"

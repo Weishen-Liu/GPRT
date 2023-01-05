@@ -184,6 +184,6 @@ void loadLights(
     // directionalLight.intensity = float3(10.f, 0.f, 0.f);
     // directionalLight.direction = float3(0.f, -1.f, 0.f);
 
-    list_of_directional_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
-    list_of_directional_lights_dir.push_back(float3(0.f, -1.f, 0.f));
+    list_of_directional_lights_intensity.push_back(float3(1.f, 0.f, 0.f));
+    list_of_directional_lights_dir.push_back(float3(-1.f, 0.f, 0.f));
 }
