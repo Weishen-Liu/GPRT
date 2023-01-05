@@ -49,8 +49,8 @@
 #define BIDIRECTION true
 #define TOTAL_SAMPLE_PER_PIXEL 10
 #define RAY_DEPTH 20
-#define LIGHT_SAMPLE_TIMES 10
-#define CAMERA_SAMPLE_TIMES 5
+#define LIGHT_SAMPLE_TIMES 300
+#define CAMERA_SAMPLE_TIMES 3
 
 float3 cartesian(float phi, float sinTheta, float cosTheta)
 {
@@ -250,9 +250,10 @@ float3 connection_with_first_hit(
   RayGenData record,
   ScatterResult lastScatterResult,
   ScatterResult camera_hit_scatter_result,
-  float3 attenuation
+  float3 attenuation,
+  float3 intensity
 ) {
-  float3 connect_to_first_hit_color = float3(0.f, 0.f, 0.f);
+  float3 connect_to_first_hit_color = intensity * attenuation;
 
   Payload payload;
   RayDesc rayDesc;
@@ -293,8 +294,8 @@ RayDesc sample_direction_from_ambient_light(ScatterResult camera_hit_scatter_res
 RayDesc sample_direction_from_directional_light(ScatterResult camera_hit_scatter_result, float3 directionalLightDir) {
 
   // Sample a random point on sphere
-  float3 sample_point = uniform_sample_sphere(1, rand_2_10(float2(camera_hit_scatter_result.scatteredOrigin.x, camera_hit_scatter_result.scatteredOrigin.y)));
-  float3 sample_point_org = sample_point + normalize(-directionalLightDir) * 100;
+  float3 sample_point = 100 * uniform_sample_sphere(1, rand_2_10(float2(camera_hit_scatter_result.scatteredOrigin.x, camera_hit_scatter_result.scatteredOrigin.y)));
+  float3 sample_point_org = sample_point + -directionalLightDir * 100;
   RayDesc rayDesc;
   rayDesc.Origin = normalize(sample_point_org);
   rayDesc.Direction = normalize(directionalLightDir);
@@ -303,12 +304,12 @@ RayDesc sample_direction_from_directional_light(ScatterResult camera_hit_scatter
   return rayDesc;
 }
 
-float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 orginal_attenuation, RayDesc rayDesc) {
+float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 orginal_attenuation, RayDesc rayDesc, float3 intensity) {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   Payload payload;
   ScatterResult lastScatterResult;
   float3 attenuation = orginal_attenuation;
-  for (int i = 0; i < RAY_DEPTH; i++) {
+  for (int depth = 0; depth < RAY_DEPTH; depth++) {
     TraceRay(
       world, // the tree
       RAY_FLAG_FORCE_OPAQUE, // ray flags
@@ -321,9 +322,9 @@ float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenDa
     );
     if (payload.scatterResult.scatterEvent == 2) {
       total_payload_color += payload.color * attenuation;
-      if (i > 0) {
+      if (depth > 0) {
         // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
-        total_payload_color += connection_with_first_hit(world, record, lastScatterResult, camera_hit_scatter_result, attenuation);
+        total_payload_color += connection_with_first_hit(world, record, lastScatterResult, camera_hit_scatter_result, attenuation, intensity);
       }
       break;
     } else if (payload.scatterResult.scatterEvent == 0) {
@@ -336,7 +337,7 @@ float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenDa
     }
 
     // Possibly terminate the path with Russian roulette
-    attenuation = russian_roulette(i, attenuation);
+    attenuation = russian_roulette(depth, attenuation);
     if (attenuation.x == 0.f && attenuation.y == 0.f && attenuation.z == 0.f) break;
   }
   return total_payload_color;
@@ -347,15 +348,17 @@ float3 calculate_from_light(RaytracingAccelerationStructure world, RayGenData re
   RayDesc rayDesc;
   for (int sampling_times = 0; sampling_times < LIGHT_SAMPLE_TIMES; sampling_times++) {
 
-    // for (int ambient_light_count = 0; ambient_light_count < record.ambient_light_size; ambient_light_count++) {
-    //   rayDesc = sample_direction_from_ambient_light(camera_hit_scatter_result);
-    //   total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc);
-    // }
+    for (int ambient_light_count = 0; ambient_light_count < record.ambient_light_size; ambient_light_count++) {
+      AmbientLight ambientLight = gprt::load<AmbientLight>(record.ambient_lights, ambient_light_count);
+      rayDesc = sample_direction_from_ambient_light(camera_hit_scatter_result);
+      total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc, ambientLight.intensity);
+    }
 
     for (int direct_light_count = 0; direct_light_count < record.directional_light_size; direct_light_count++) {
       float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, direct_light_count);
+      float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, direct_light_count);
       rayDesc = sample_direction_from_directional_light(camera_hit_scatter_result, directionalLightDir);
-      total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc);
+      total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc, directionalLightIntensity);
     }
   }
   return total_payload_color / LIGHT_SAMPLE_TIMES;
@@ -396,6 +399,9 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         );
         if (payload.scatterResult.scatterEvent == 2) {
           total_payload_color += payload.color * attenuation;
+          if (camera_hit > 0) {
+            total_payload_color += calculate_from_light(world, record, camera_hit_scatter_result, attenuation);
+          }
           break;
         } else if (payload.scatterResult.scatterEvent == 0) {
           break;
@@ -404,15 +410,11 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
           rayDesc.Origin = payload.scatterResult.scatteredOrigin;
           rayDesc.Direction = payload.scatterResult.scatteredDirection;
           camera_hit_scatter_result = payload.scatterResult;
-          got_hit = true;
         }
 
         // Possibly terminate the path with Russian roulette
         attenuation = russian_roulette(camera_hit, attenuation);
         if (attenuation.x == 0.f && attenuation.y == 0.f && attenuation.z == 0.f) break;
-      }
-      if (got_hit) {
-        total_payload_color += calculate_from_light(world, record, camera_hit_scatter_result, attenuation);
       }
     }
 
