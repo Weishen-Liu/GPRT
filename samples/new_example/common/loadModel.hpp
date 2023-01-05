@@ -172,15 +172,18 @@ void loadModel(
 
 void loadLights(
     std::vector<AmbientLight>& list_of_ambient_lights,
-    std::vector<DirectionalLight>& list_of_directional_lights
+    std::vector<float3>& list_of_directional_lights_intensity,
+    std::vector<float3>& list_of_directional_lights_dir
 )
 {
     AmbientLight ambientLight;
     ambientLight.setIntensity(float3(1.f, 1.f, 1.f));
     list_of_ambient_lights.push_back(ambientLight);
 
-    DirectionalLight directionalLight;
-    directionalLight.setIntensity(float3(1.f, 1.f, 1.f));
-    directionalLight.setDirection(normalize(float3(0.f, 12.f, 0.f)));
-    list_of_directional_lights.push_back(directionalLight);
+    // DirectionalLight directionalLight;
+    // directionalLight.intensity = float3(10.f, 0.f, 0.f);
+    // directionalLight.direction = float3(0.f, -1.f, 0.f);
+
+    list_of_directional_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
+    list_of_directional_lights_dir.push_back(float3(0.f, -1.f, 0.f));
 }

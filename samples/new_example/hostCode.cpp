@@ -108,7 +108,7 @@ std::vector<float3> list_of_vertex_normals;
 std::vector<float4x4> list_of_transform = {
     // translation_matrix(float3(0.0f, 0.0f, 1.1f)),
     translation_matrix(float3(0.0f, 0.0f, 0.0f)),
-    translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
+    // translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .66), 2 * cos(2 * M_PI * .66), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f)),
@@ -118,6 +118,8 @@ std::vector<float4x4> list_of_transform = {
 // Lights
 std::vector<AmbientLight> list_of_ambient_lights;
 std::vector<DirectionalLight> list_of_directional_lights;
+std::vector<float3> list_of_directional_lights_intensity;
+std::vector<float3> list_of_directional_lights_direction;
 
 // Materials
 std::vector<Lambertian> list_of_lambertians;
@@ -273,7 +275,8 @@ int main(int ac, char **av)
         {"camera.dir_dv", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_dv)},
         {"ambient_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, ambient_lights)},
         {"ambient_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, ambient_light_size)},
-        {"directional_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights)},
+        {"directional_lights_intensity", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights_intensity)},
+        {"directional_lights_dir", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights_dir)},
         {"directional_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, directional_light_size)},
         {/* sentinel to mark end of list */}};
 
@@ -291,13 +294,17 @@ int main(int ac, char **av)
     // ----------- create lights  ----------------------------
     loadLights(
         list_of_ambient_lights,
-        list_of_directional_lights
+        list_of_directional_lights_intensity,
+        list_of_directional_lights_direction
     );
     GPRTBuffer ambientLightBuffer = gprtDeviceBufferCreate(
         context, GPRT_USER_TYPE(list_of_ambient_lights[0]), list_of_ambient_lights.size(), static_cast<const void *>(list_of_ambient_lights.data())
     );
-    GPRTBuffer directionalLightBuffer = gprtDeviceBufferCreate(
-        context, GPRT_USER_TYPE(list_of_directional_lights[0]), list_of_directional_lights.size(), static_cast<const void *>(list_of_directional_lights.data())
+    GPRTBuffer directionalLightIntensityBuffer = gprtDeviceBufferCreate(
+        context, GPRT_USER_TYPE(list_of_directional_lights_intensity[0]), list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data())
+    );
+    GPRTBuffer directionalLightDirBuffer = gprtDeviceBufferCreate(
+        context, GPRT_USER_TYPE(list_of_directional_lights_direction[0]), list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data())
     );
 
     // ----------- set variables  ----------------------------
@@ -308,8 +315,9 @@ int main(int ac, char **av)
     gprtRayGenSetAccel(rayGen, "world", world);
     gprtRayGenSetBuffer(rayGen, "ambient_lights", ambientLightBuffer);
     gprtRayGenSet1i(rayGen, "ambient_light_size", (uint64_t)list_of_ambient_lights.size());
-    gprtRayGenSetBuffer(rayGen, "directional_lights", directionalLightBuffer);
-    gprtRayGenSet1i(rayGen, "directional_light_size", (uint64_t)list_of_directional_lights.size());
+    gprtRayGenSetBuffer(rayGen, "directional_lights_intensity", directionalLightIntensityBuffer);
+    gprtRayGenSetBuffer(rayGen, "directional_lights_dir", directionalLightDirBuffer);
+    gprtRayGenSet1i(rayGen, "directional_light_size", (uint64_t)list_of_directional_lights_intensity.size());
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -455,7 +463,8 @@ int main(int ac, char **av)
     glfwTerminate();
 
     gprtBufferDestroy(ambientLightBuffer);
-    gprtBufferDestroy(directionalLightBuffer);
+    gprtBufferDestroy(directionalLightIntensityBuffer);
+    gprtBufferDestroy(directionalLightDirBuffer);
     gprtBufferDestroy(vertexBuffer);
     gprtBufferDestroy(normalBuffer);
     gprtBufferDestroy(indexBuffer);
