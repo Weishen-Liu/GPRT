@@ -45,7 +45,8 @@ struct TrianglesGeomData
     alignas(16) gprt::Buffer color; // vec3f *
 
     alignas(16) gprt::Buffer lambertian; // vec3f *
-    alignas(16) gprt::Buffer metal;      // vec3f *
+    alignas(16) gprt::Buffer metal_albedo;      // vec3f *
+    alignas(16) gprt::Buffer metal_fuzz;      // vec3f *
     alignas(16) gprt::Buffer dielectric;      // vec3f *
 };
 
@@ -91,8 +92,16 @@ struct ScatterResult
     float3 normal;
 };
 
+struct RandSeed {
+    uint state;
+    float random_number;
+    float2 random_number_2;
+    float3 random_number_3;
+};
+
 struct Payload
 {
     float3 color;
     ScatterResult scatterResult;
+    RandSeed rand;
 };

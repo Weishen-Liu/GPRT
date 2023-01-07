@@ -88,7 +88,8 @@ void loadModel(
     std::vector<float3>& list_of_colors,
     std::vector<float3>&list_of_vertex_normals,
     std::vector<Lambertian>&list_of_lambertians,
-    std::vector<Metal>&list_of_metals,
+    std::vector<float3>&list_of_metals_albedo,
+    std::vector<float>&list_of_metals_fuzz,
     std::vector<Dielectric>&list_of_dielectrics,
     float4x4 transform
 )
@@ -159,10 +160,8 @@ void loadModel(
         lambertian.albedo = lambertian_color;
         list_of_lambertians.push_back(lambertian);
 
-        Metal metal;
-        metal.albedo = metal_color;
-        metal.fuzz = metal_fuzz;
-        list_of_metals.push_back(metal);
+        list_of_metals_albedo.push_back(metal_color);
+        list_of_metals_fuzz.push_back(metal_fuzz);
 
         Dielectric dielectric;
         dielectric.ref_idx = dielectric_ref_idx;
@@ -184,6 +183,6 @@ void loadLights(
     // directionalLight.intensity = float3(10.f, 0.f, 0.f);
     // directionalLight.direction = float3(0.f, -1.f, 0.f);
 
-    list_of_directional_lights_intensity.push_back(float3(1.f, 0.f, 0.f));
+    list_of_directional_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
     list_of_directional_lights_dir.push_back(float3(-1.f, 0.f, 0.f));
 }
