@@ -124,6 +124,8 @@ std::vector<float3> list_of_directional_lights_direction;
 // Materials
 std::vector<Lambertian> list_of_lambertians;
 std::vector<Metal> list_of_metals;
+std::vector<float3> list_of_metals_albedo;
+std::vector<float> list_of_metals_fuzz;
 std::vector<Dielectric> list_of_dielectrics;
 
 float transform[3][4] =
@@ -163,7 +165,8 @@ int main(int ac, char **av)
         // { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
         {"color", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, color)},
         {"normal", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, normal)},
-        {"metal", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal)},
+        {"metal_albedo", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal_albedo)},
+        {"metal_fuzz", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal_fuzz)},
         {"lambertian", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, lambertian)},
         {"dielectric", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, dielectric)},
         {/* sentinel to mark end of list */}};
@@ -192,7 +195,8 @@ int main(int ac, char **av)
             list_of_colors,
             list_of_vertex_normals,
             list_of_lambertians,
-            list_of_metals,
+            list_of_metals_albedo,
+            list_of_metals_fuzz,
             list_of_dielectrics,
             list_of_transform[each_path]
         );
@@ -202,7 +206,8 @@ int main(int ac, char **av)
     GPRTBuffer indexBuffer = gprtDeviceBufferCreate(context, GPRT_INT3, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
     GPRTBuffer colorBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
     GPRTBuffer lambertianBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_lambertians[0]), list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
-    GPRTBuffer metalBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals[0]), list_of_metals.size(), static_cast<const void *>(list_of_metals.data()));
+    GPRTBuffer metalAlbedoBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals_albedo[0]), list_of_metals_albedo.size(), static_cast<const void *>(list_of_metals_albedo.data()));
+    GPRTBuffer metalFuzzBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals_fuzz[0]), list_of_metals_fuzz.size(), static_cast<const void *>(list_of_metals_fuzz.data()));
     GPRTBuffer dielectricBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_dielectrics[0]), list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
     GPRTBuffer frameBuffer = gprtHostBufferCreate(context, GPRT_INT, fbSize.x * fbSize.y);
     GPRTBuffer accBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, fbSize.x * fbSize.y, nullptr);
@@ -210,24 +215,15 @@ int main(int ac, char **av)
 
     gprtTrianglesSetVertices(trianglesGeom, vertexBuffer,
                              list_of_vertices.size(), sizeof(float3), 0);
-    gprtTrianglesSetVertexNormal(trianglesGeom, normalBuffer,
-                                 list_of_vertex_normals.size(), sizeof(float3), 0);
     gprtTrianglesSetIndices(trianglesGeom, indexBuffer,
                             list_of_indices.size(), sizeof(int3), 0);
-    gprtTrianglesSetVertexColor(trianglesGeom, colorBuffer,
-                                list_of_colors.size(), sizeof(float3), 0);
-    gprtTrianglesSetLambertian(trianglesGeom, lambertianBuffer,
-                               list_of_lambertians.size(), sizeof(Lambertian), 0);
-    gprtTrianglesSetMetal(trianglesGeom, metalBuffer,
-                          list_of_metals.size(), sizeof(Metal), 0);
-    gprtTrianglesSetDielectric(trianglesGeom, dielectricBuffer,
-                          list_of_dielectrics.size(), sizeof(Metal), 0);
 
     gprtGeomSetBuffer(trianglesGeom, "vertex", vertexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "normal", normalBuffer);
     gprtGeomSetBuffer(trianglesGeom, "index", indexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "color", colorBuffer);
-    gprtGeomSetBuffer(trianglesGeom, "metal", metalBuffer);
+    gprtGeomSetBuffer(trianglesGeom, "metal_albedo", metalAlbedoBuffer);
+    gprtGeomSetBuffer(trianglesGeom, "metal_fuzz", metalFuzzBuffer);
     gprtGeomSetBuffer(trianglesGeom, "lambertian", lambertianBuffer);
     gprtGeomSetBuffer(trianglesGeom, "dielectric", dielectricBuffer);
 
@@ -468,7 +464,8 @@ int main(int ac, char **av)
     gprtBufferDestroy(vertexBuffer);
     gprtBufferDestroy(normalBuffer);
     gprtBufferDestroy(indexBuffer);
-    gprtBufferDestroy(metalBuffer);
+    gprtBufferDestroy(metalAlbedoBuffer);
+    gprtBufferDestroy(metalFuzzBuffer);
     gprtBufferDestroy(lambertianBuffer);
     gprtBufferDestroy(dielectricBuffer);
     gprtBufferDestroy(colorBuffer);

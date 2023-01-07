@@ -521,16 +521,6 @@ GPRT_API void gprtTrianglesSetVertices(GPRTGeom triangles,
                                       size_t count,
                                       size_t stride GPRT_IF_CPP(=sizeof(float3)),
                                       size_t offset GPRT_IF_CPP(=0));
-GPRT_API void gprtTrianglesSetVertexNormal(GPRTGeom triangles,
-                                          GPRTBuffer _normals,
-                                          size_t count,
-                                          size_t stride,
-                                          size_t offset);
-GPRT_API void gprtTrianglesSetVertexColor(GPRTGeom _triangles,
-                                          GPRTBuffer _colors,
-                                          size_t count,
-                                          size_t stride,
-                                          size_t offset);
 // GPRT_API void gprtTrianglesSetMotionVertices(GPRTGeom triangles,
 //                                            /*! number of vertex arrays
 //                                                passed here, the first
@@ -549,23 +539,6 @@ GPRT_API void gprtTrianglesSetIndices(GPRTGeom triangles,
                                      size_t count,
                                      size_t stride GPRT_IF_CPP(=sizeof(uint3)),
                                      size_t offset GPRT_IF_CPP(=0));
-
-GPRT_API void gprtTrianglesSetMetal(GPRTGeom triangles,
-                                     GPRTBuffer metals,
-                                     size_t count,
-                                     size_t stride,
-                                     size_t offset);
-
-GPRT_API void gprtTrianglesSetLambertian(GPRTGeom triangles,
-                                     GPRTBuffer lambertians,
-                                     size_t count,
-                                     size_t stride,
-                                     size_t offset);
-GPRT_API void gprtTrianglesSetDielectric(GPRTGeom triangles,
-                                     GPRTBuffer dielectric,
-                                     size_t count,
-                                     size_t stride,
-                                     size_t offset);
 
 /*! set the aabb positions (minX, minY, minZ, maxX, maxY, maxZ) 
   for the given AABB geometry. This _has_ to be set before the accel(s) 
