@@ -87,6 +87,8 @@ void loadModel(
     std::vector<int3>& list_of_indices,
     std::vector<float3>& list_of_colors,
     std::vector<float3>&list_of_vertex_normals,
+    int material_type,
+    std::vector<int>&list_of_material_type,
     std::vector<Lambertian>&list_of_lambertians,
     std::vector<float3>&list_of_metals_albedo,
     std::vector<float>&list_of_metals_fuzz,
@@ -152,6 +154,25 @@ void loadModel(
     float3 metal_color = float3(random(), random(), random());
     float metal_fuzz = random();
     float dielectric_ref_idx = random();
+
+    int material_index = 0;
+    if (material_type != -1) {
+        material_index = material_type;
+    } else {
+        if (random() < random()) {
+            // Lambertian
+            material_index = 0;
+        } else {
+            if (random() < random()) {
+                // Metal
+                material_index = 1;
+            } else {
+                // Dielectric
+                material_index = 2;
+            }
+        }
+    }
+    
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
@@ -166,23 +187,19 @@ void loadModel(
         Dielectric dielectric;
         dielectric.ref_idx = dielectric_ref_idx;
         list_of_dielectrics.push_back(dielectric);
+
+        list_of_material_type.push_back(material_index);
     }
 }
 
 void loadLights(
-    std::vector<AmbientLight>& list_of_ambient_lights,
+    std::vector<float3>& list_of_ambient_lights_intensity,
     std::vector<float3>& list_of_directional_lights_intensity,
     std::vector<float3>& list_of_directional_lights_dir
 )
 {
-    AmbientLight ambientLight;
-    ambientLight.setIntensity(float3(1.f, 1.f, 1.f));
-    list_of_ambient_lights.push_back(ambientLight);
-
-    // DirectionalLight directionalLight;
-    // directionalLight.intensity = float3(10.f, 0.f, 0.f);
-    // directionalLight.direction = float3(0.f, -1.f, 0.f);
+    list_of_ambient_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
 
     list_of_directional_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
-    list_of_directional_lights_dir.push_back(float3(-1.f, 0.f, 0.f));
+    list_of_directional_lights_dir.push_back(float3(0.f, 1.f, 0.f));
 }
