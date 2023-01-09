@@ -98,6 +98,10 @@ struct RandSeed {
     float random_number;
     float2 random_number_2;
     float3 random_number_3;
+
+    float3 rayDescOrg;
+    float3 rayDescDir;
+    float3 bidir_total_color;
 };
 
 struct Payload
