@@ -46,10 +46,10 @@
 #define M_PI 3.1415926f
 #endif
 
-#define BIDIRECTION false
+#define BIDIRECTION true
 #define TOTAL_SAMPLE_PER_PIXEL 100
 #define RAY_DEPTH 20
-#define LIGHT_SAMPLE_TIMES 300
+#define LIGHT_SAMPLE_TIMES 100
 #define CAMERA_SAMPLE_TIMES 3
 
 uint rand_init(uint val0, uint val1)
@@ -200,7 +200,7 @@ float3 connection_with_first_hit(
   float3 attenuation,
   float3 intensity
 ) {
-  float3 connect_to_first_hit_color = intensity * attenuation;
+  float3 connect_to_first_hit_color = float3(0.f, 0.f, 0.f);
 
   Payload payload;
   RayDesc rayDesc;
@@ -227,35 +227,35 @@ float3 connection_with_first_hit(
   return connect_to_first_hit_color;
 }
 
-RayDesc sample_direction_from_ambient_light(ScatterResult camera_hit_scatter_result) {
+Payload sample_direction_from_ambient_light(ScatterResult camera_hit_scatter_result, Payload payload) {
   // Sample a random point on sphere
-  float3 sample_point = 100 * uniform_sample_sphere(1, rand_2_10(float2(camera_hit_scatter_result.scatteredOrigin.x, camera_hit_scatter_result.scatteredOrigin.y)));
-  RayDesc rayDesc;
-  rayDesc.Origin = normalize(sample_point);
-  rayDesc.Direction = normalize(-sample_point);
-  rayDesc.TMin = 1e-3f;
-  rayDesc.TMax = 1e10f;
-  return rayDesc;
+  payload.rand = rand_generate(payload.rand, 2);
+  float3 sample_point = 100 * ramdom_point_in_unit_sphere(payload.rand.random_number_2);
+  payload.rand.rayDescOrg = normalize(sample_point);
+  payload.rand.rayDescDir = normalize(-sample_point);
+  return payload;
 }
 
-RayDesc sample_direction_from_directional_light(ScatterResult camera_hit_scatter_result, float3 directionalLightDir) {
+Payload sample_direction_from_directional_light(ScatterResult camera_hit_scatter_result, float3 directionalLightDir, Payload payload) {
 
   // Sample a random point on sphere
-  float3 sample_point = 100 * uniform_sample_sphere(1, rand_2_10(float2(camera_hit_scatter_result.scatteredOrigin.x, camera_hit_scatter_result.scatteredOrigin.y)));
+  payload.rand = rand_generate(payload.rand, 2);
+  float3 sample_point = 100 * ramdom_point_in_unit_sphere(payload.rand.random_number_2);
   float3 sample_point_org = sample_point + -directionalLightDir * 100;
-  RayDesc rayDesc;
-  rayDesc.Origin = normalize(sample_point_org);
-  rayDesc.Direction = normalize(directionalLightDir);
-  rayDesc.TMin = 1e-3f;
-  rayDesc.TMax = 1e10f;
-  return rayDesc;
+  payload.rand.rayDescOrg = normalize(sample_point_org);
+  payload.rand.rayDescDir = normalize(directionalLightDir);
+  return payload;
 }
 
-float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 orginal_attenuation, RayDesc rayDesc, float3 intensity) {
+Payload bidirectional_calculation(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 attenuation, Payload payload, float3 intensity) {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
-  Payload payload;
+
   ScatterResult lastScatterResult;
-  float3 attenuation = orginal_attenuation;
+  RayDesc rayDesc;
+  rayDesc.Origin = payload.rand.rayDescOrg;
+  rayDesc.Direction = payload.rand.rayDescDir;
+  rayDesc.TMin = 1e-3f;
+  rayDesc.TMax = 1e10f;
   for (int depth = 0; depth < RAY_DEPTH; depth++) {
     TraceRay(
       world, // the tree
@@ -270,7 +270,6 @@ float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenDa
     if (payload.scatterResult.scatterEvent == 2) {
       total_payload_color += payload.color * attenuation;
       if (depth > 0) {
-        // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
         total_payload_color += connection_with_first_hit(world, record, lastScatterResult, camera_hit_scatter_result, attenuation, intensity);
       }
       break;
@@ -287,25 +286,29 @@ float3 bidirectional_calculation(RaytracingAccelerationStructure world, RayGenDa
     attenuation = russian_roulette(depth, attenuation);
     if (attenuation.x == 0.f && attenuation.y == 0.f && attenuation.z == 0.f) break;
   }
-  return total_payload_color;
+  payload.rand.bidir_total_color = total_payload_color;
+  return payload;
 }
 
-float3 calculate_from_light(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 orginal_attenuation) {
+float3 calculate_from_light(RaytracingAccelerationStructure world, RayGenData record, ScatterResult camera_hit_scatter_result, float3 attenuation, Payload payload) {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   RayDesc rayDesc;
+  float3 intensity;
   for (int sampling_times = 0; sampling_times < LIGHT_SAMPLE_TIMES; sampling_times++) {
-
-    for (int ambient_light_count = 0; ambient_light_count < record.ambient_light_size; ambient_light_count++) {
-      float3 ambientLightIntensity = gprt::load<float3>(record.ambient_lights_intensity, ambient_light_count);
-      rayDesc = sample_direction_from_ambient_light(camera_hit_scatter_result);
-      total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc, ambientLightIntensity);
-    }
+    // for (int ambient_light_count = 0; ambient_light_count < record.ambient_light_size; ambient_light_count++) {
+    //   intensity = gprt::load<float3>(record.ambient_lights_intensity, ambient_light_count);
+    //   payload = sample_direction_from_ambient_light(camera_hit_scatter_result, payload);
+    //   payload = bidirectional_calculation(world, record, camera_hit_scatter_result, attenuation, payload, intensity);
+    //   total_payload_color += payload.rand.bidir_total_color;
+    // }
 
     for (int direct_light_count = 0; direct_light_count < record.directional_light_size; direct_light_count++) {
       float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, direct_light_count);
-      float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, direct_light_count);
-      rayDesc = sample_direction_from_directional_light(camera_hit_scatter_result, directionalLightDir);
-      total_payload_color += bidirectional_calculation(world, record, camera_hit_scatter_result, orginal_attenuation, rayDesc, directionalLightIntensity);
+
+      intensity = gprt::load<float3>(record.directional_lights_intensity, direct_light_count);
+      payload = sample_direction_from_directional_light(camera_hit_scatter_result, directionalLightDir, payload);
+      payload = bidirectional_calculation(world, record, camera_hit_scatter_result, attenuation, payload, intensity);
+      total_payload_color += payload.rand.bidir_total_color;
     }
   }
   return total_payload_color / LIGHT_SAMPLE_TIMES;
@@ -313,19 +316,24 @@ float3 calculate_from_light(RaytracingAccelerationStructure world, RayGenData re
 
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
+  float3 total_payload_color = float3(0.f, 0.f, 0.f);
+  uint2 pixelID = DispatchRaysIndex().xy;
+  float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
+
   if (BIDIRECTION) {
-    float3 total_payload_color = float3(0.f, 0.f, 0.f);
-    uint2 pixelID = DispatchRaysIndex().xy;
-    float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
-    for (int each_sample = 0; each_sample < TOTAL_SAMPLE_PER_PIXEL; each_sample++) {
+    for (int each_sample = 0; each_sample < TOTAL_SAMPLE_PER_PIXEL; each_sample++)
+    {
       Payload payload;
+      payload.rand.state = rand_init(pixelID.x + 1024 * each_sample, pixelID.y + 1024 * each_sample);
       RayDesc rayDesc;
+      payload.rand = rand_generate(payload.rand, 2);
       rayDesc.Origin = record.camera.pos;
+      rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(record.fbSize).x - 1);
       rayDesc.Direction = 
         normalize(record.camera.dir_00
         + screen.x * record.camera.dir_du
         + screen.y * record.camera.dir_dv
-        - record.camera.pos
+        - rayDesc.Origin
       );
       rayDesc.TMin = 1e-3f;
       rayDesc.TMax = 1e10f;
@@ -347,7 +355,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         if (payload.scatterResult.scatterEvent == 2) {
           total_payload_color += payload.color * attenuation;
           if (camera_hit > 0) {
-            total_payload_color += calculate_from_light(world, record, camera_hit_scatter_result, attenuation);
+            total_payload_color += direct_lighting(world, record, camera_hit_scatter_result, attenuation);
+            total_payload_color += calculate_from_light(world, record, camera_hit_scatter_result, attenuation, payload);
           }
           break;
         } else if (payload.scatterResult.scatterEvent == 0) {
@@ -373,10 +382,6 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
 
   } else {
-    float3 total_payload_color = float3(0.f, 0.f, 0.f);
-    uint2 pixelID = DispatchRaysIndex().xy;
-    float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
-
     for (int each_sample = 0; each_sample < TOTAL_SAMPLE_PER_PIXEL; each_sample++)
     {
       Payload payload;
@@ -411,9 +416,9 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
         if (payload.scatterResult.scatterEvent == 2) {
           total_payload_color += payload.color * attenuation;
-          // if (i > 0) {
-          //   total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
-          // }
+          if (i > 0) {
+            total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+          }
           break;
         } else if (payload.scatterResult.scatterEvent == 0) {
           total_payload_color += float3(0.f, 0.f, 0.f);
@@ -612,14 +617,17 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
 
   int material_type = gprt::load<int>(record.material_type, primID);
   if (material_type == 0) {
+    // Lambertian
     Lambertian lambertian = gprt::load<Lambertian>(record.lambertian, primID);
     payload.scatterResult = scatter(lambertian, targetPoint, normal, payload);
   } else if (material_type == 1) {
+    // Metal
     Metal metal;
     metal.albedo = gprt::load<float3>(record.metal_albedo, primID);
     metal.fuzz = gprt::load<float>(record.metal_fuzz, primID);
     payload.scatterResult = scatter(metal, targetPoint, normal, payload);
   } else if (material_type == 2) {
+    // Dielectric
     Dielectric dielectric = gprt::load<Dielectric>(record.dielectric, primID);
     payload.scatterResult = scatter(dielectric, targetPoint, normal, payload);
   }
