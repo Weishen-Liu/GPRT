@@ -74,8 +74,8 @@ extern GPRTProgram new_example_deviceCode;
 
 const std::vector<std::string> MODEL_PATH = {
     "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
@@ -83,32 +83,15 @@ const std::vector<std::string> MODEL_PATH = {
 };
 const std::string TEXTURE_PATH = "/media/storage0/weishen/GPRT-1/samples/new_example/textures/viking_room.png";
 
-const int NUM_VERTICES = 8;
-float3 vertices[NUM_VERTICES] =
-    {
-        {-1.f, -1.f, -1.f},
-        {+1.f, -1.f, -1.f},
-        {-1.f, +1.f, -1.f},
-        {+1.f, +1.f, -1.f},
-        {-1.f, -1.f, +1.f},
-        {+1.f, -1.f, +1.f},
-        {-1.f, +1.f, +1.f},
-        {+1.f, +1.f, +1.f}};
-
-const int NUM_INDICES = 12;
-int3 indices[NUM_INDICES] =
-    {
-        {0, 1, 3}, {2, 3, 0}, {5, 7, 6}, {5, 6, 4}, {0, 4, 5}, {0, 5, 1}, {2, 3, 7}, {2, 7, 6}, {1, 5, 7}, {1, 7, 3}, {4, 0, 2}, {4, 2, 6}};
-
 // Geometry
 std::vector<int3> list_of_indices;
 std::vector<float3> list_of_vertices;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
 std::vector<float4x4> list_of_transform = {
-    // translation_matrix(float3(0.0f, 0.0f, 1.1f)),
+    translation_matrix(float3(0.0f, 0.0f, 1.1f)),
     translation_matrix(float3(0.0f, 0.0f, 0.0f)),
-    // translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
+    translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .66), 2 * cos(2 * M_PI * .66), 1.5f)),
     translation_matrix(float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f)),
@@ -116,23 +99,26 @@ std::vector<float4x4> list_of_transform = {
 };
 
 // Lights
-std::vector<AmbientLight> list_of_ambient_lights;
-std::vector<DirectionalLight> list_of_directional_lights;
+std::vector<float3> list_of_ambient_lights_intensity;
 std::vector<float3> list_of_directional_lights_intensity;
 std::vector<float3> list_of_directional_lights_direction;
 
 // Materials
+std::vector<int> material_types {
+    0, // viking_room
+    2, // Cube
+    0, // Mario
+    // 2, // bunny
+    // 0, // sphere
+    // 0, // sponza
+    // 0 // horse
+};
+std::vector<int> list_of_material_type;
 std::vector<Lambertian> list_of_lambertians;
 std::vector<Metal> list_of_metals;
 std::vector<float3> list_of_metals_albedo;
 std::vector<float> list_of_metals_fuzz;
 std::vector<Dielectric> list_of_dielectrics;
-
-float transform[3][4] =
-    {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f};
 
 // initial image resolution
 const int2 fbSize = {800, 600};
@@ -162,9 +148,9 @@ int main(int ac, char **av)
     GPRTVarDecl trianglesGeomVars[] = {
         {"index", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, index)},
         {"vertex", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, vertex)},
-        // { "color",  GPRT_FLOAT3, GPRT_OFFSETOF(TrianglesGeomData,color)},
         {"color", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, color)},
         {"normal", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, normal)},
+        {"material_type", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, material_type)},
         {"metal_albedo", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal_albedo)},
         {"metal_fuzz", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, metal_fuzz)},
         {"lambertian", GPRT_BUFFER, GPRT_OFFSETOF(TrianglesGeomData, lambertian)},
@@ -174,8 +160,7 @@ int main(int ac, char **av)
                                                         GPRT_TRIANGLES,
                                                         sizeof(TrianglesGeomData),
                                                         trianglesGeomVars, -1);
-    gprtGeomTypeSetClosestHitProg(trianglesGeomType, 0,
-                                  module, "TriangleMesh");
+    gprtGeomTypeSetClosestHitProg(trianglesGeomType, 0, module, "TriangleMesh");
 
     // ##################################################################
     // set up all the *GEOMS* we want to run that code on
@@ -186,14 +171,17 @@ int main(int ac, char **av)
     // ------------------------------------------------------------------
     // triangle mesh
     // ------------------------------------------------------------------
-
+    int each_material_type = -1;
     for (int each_path = 0; each_path < MODEL_PATH.size(); each_path++) {
+        int each_material_type = material_types[each_path];
         loadModel(
             MODEL_PATH[each_path],
             list_of_vertices,
             list_of_indices,
             list_of_colors,
             list_of_vertex_normals,
+            each_material_type,
+            list_of_material_type,
             list_of_lambertians,
             list_of_metals_albedo,
             list_of_metals_fuzz,
@@ -201,27 +189,29 @@ int main(int ac, char **av)
             list_of_transform[each_path]
         );
     }
+    
     GPRTBuffer vertexBuffer = gprtHostBufferCreate(context, GPRT_FLOAT3, list_of_vertices.size(), static_cast<const void *>(list_of_vertices.data()));
-    GPRTBuffer normalBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
     GPRTBuffer indexBuffer = gprtDeviceBufferCreate(context, GPRT_INT3, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
+    GPRTBuffer normalBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
     GPRTBuffer colorBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
+    GPRTBuffer materialTypeBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_material_type[0]), list_of_material_type.size(), static_cast<const void *>(list_of_material_type.data()));
     GPRTBuffer lambertianBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_lambertians[0]), list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
     GPRTBuffer metalAlbedoBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals_albedo[0]), list_of_metals_albedo.size(), static_cast<const void *>(list_of_metals_albedo.data()));
     GPRTBuffer metalFuzzBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_metals_fuzz[0]), list_of_metals_fuzz.size(), static_cast<const void *>(list_of_metals_fuzz.data()));
     GPRTBuffer dielectricBuffer = gprtDeviceBufferCreate(context, GPRT_USER_TYPE(list_of_dielectrics[0]), list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
     GPRTBuffer frameBuffer = gprtHostBufferCreate(context, GPRT_INT, fbSize.x * fbSize.y);
     GPRTBuffer accBuffer = gprtDeviceBufferCreate(context, GPRT_FLOAT3, fbSize.x * fbSize.y, nullptr);
-    GPRTGeom trianglesGeom = gprtGeomCreate(context, trianglesGeomType);
 
+    GPRTGeom trianglesGeom = gprtGeomCreate(context, trianglesGeomType);
     gprtTrianglesSetVertices(trianglesGeom, vertexBuffer,
                              list_of_vertices.size(), sizeof(float3), 0);
     gprtTrianglesSetIndices(trianglesGeom, indexBuffer,
                             list_of_indices.size(), sizeof(int3), 0);
-
     gprtGeomSetBuffer(trianglesGeom, "vertex", vertexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "normal", normalBuffer);
     gprtGeomSetBuffer(trianglesGeom, "index", indexBuffer);
     gprtGeomSetBuffer(trianglesGeom, "color", colorBuffer);
+    gprtGeomSetBuffer(trianglesGeom, "material_type", materialTypeBuffer);
     gprtGeomSetBuffer(trianglesGeom, "metal_albedo", metalAlbedoBuffer);
     gprtGeomSetBuffer(trianglesGeom, "metal_fuzz", metalFuzzBuffer);
     gprtGeomSetBuffer(trianglesGeom, "lambertian", lambertianBuffer);
@@ -253,7 +243,6 @@ int main(int ac, char **av)
 
     // ----------- set variables  ----------------------------
     gprtMissSet3f(miss, "color0", 1.f, 1.f, 1.f);
-    // gprtMissSet3f(miss,"color0",0.1f,0.1f,0.1f);
     gprtMissSet3f(miss, "color1", .0f, .0f, .0f);
 
     // -------------------------------------------------------
@@ -269,12 +258,17 @@ int main(int ac, char **av)
         {"camera.dir_00", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_00)},
         {"camera.dir_du", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_du)},
         {"camera.dir_dv", GPRT_FLOAT3, GPRT_OFFSETOF(RayGenData, camera.dir_dv)},
-        {"ambient_lights", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, ambient_lights)},
+        {"ambient_lights_intensity", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, ambient_lights_intensity)},
         {"ambient_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, ambient_light_size)},
         {"directional_lights_intensity", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights_intensity)},
         {"directional_lights_dir", GPRT_BUFFER, GPRT_OFFSETOF(RayGenData, directional_lights_dir)},
         {"directional_light_size", GPRT_INT, GPRT_OFFSETOF(RayGenData, directional_light_size)},
         {/* sentinel to mark end of list */}};
+
+    // ----------- create object  ----------------------------
+    GPRTRayGen rayGen = gprtRayGenCreate(context, module, "simpleRayGen",
+                                         sizeof(RayGenData),
+                                         rayGenVars, -1);
 
     // ----------- create camera  ----------------------------
     Viewer viewer;
@@ -283,24 +277,21 @@ int main(int ac, char **av)
                                  lookUp,
                                  cosFovy);
 
-    // ----------- create object  ----------------------------
-    GPRTRayGen rayGen = gprtRayGenCreate(context, module, "simpleRayGen",
-                                         sizeof(RayGenData),
-                                         rayGenVars, -1);
     // ----------- create lights  ----------------------------
     loadLights(
-        list_of_ambient_lights,
+        list_of_ambient_lights_intensity,
         list_of_directional_lights_intensity,
         list_of_directional_lights_direction
     );
-    GPRTBuffer ambientLightBuffer = gprtDeviceBufferCreate(
-        context, GPRT_USER_TYPE(list_of_ambient_lights[0]), list_of_ambient_lights.size(), static_cast<const void *>(list_of_ambient_lights.data())
+
+    GPRTBuffer ambientLightIntensityBuffer = gprtDeviceBufferCreate(
+        context, GPRT_FLOAT3, list_of_ambient_lights_intensity.size(), static_cast<const void *>(list_of_ambient_lights_intensity.data())
     );
     GPRTBuffer directionalLightIntensityBuffer = gprtDeviceBufferCreate(
-        context, GPRT_USER_TYPE(list_of_directional_lights_intensity[0]), list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data())
+        context, GPRT_FLOAT3, list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data())
     );
     GPRTBuffer directionalLightDirBuffer = gprtDeviceBufferCreate(
-        context, GPRT_USER_TYPE(list_of_directional_lights_direction[0]), list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data())
+        context, GPRT_FLOAT3, list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data())
     );
 
     // ----------- set variables  ----------------------------
@@ -309,8 +300,8 @@ int main(int ac, char **av)
     gprtRayGenSetBuffer(rayGen, "fbPtr", frameBuffer);
     gprtRayGenSet2iv(rayGen, "fbSize", (int32_t *)&fbSize);
     gprtRayGenSetAccel(rayGen, "world", world);
-    gprtRayGenSetBuffer(rayGen, "ambient_lights", ambientLightBuffer);
-    gprtRayGenSet1i(rayGen, "ambient_light_size", (uint64_t)list_of_ambient_lights.size());
+    gprtRayGenSetBuffer(rayGen, "ambient_lights_intensity", ambientLightIntensityBuffer);
+    gprtRayGenSet1i(rayGen, "ambient_light_size", (uint64_t)list_of_ambient_lights_intensity.size());
     gprtRayGenSetBuffer(rayGen, "directional_lights_intensity", directionalLightIntensityBuffer);
     gprtRayGenSetBuffer(rayGen, "directional_lights_dir", directionalLightDirBuffer);
     gprtRayGenSet1i(rayGen, "directional_light_size", (uint64_t)list_of_directional_lights_intensity.size());
@@ -458,12 +449,13 @@ int main(int ac, char **av)
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    gprtBufferDestroy(ambientLightBuffer);
+    gprtBufferDestroy(ambientLightIntensityBuffer);
     gprtBufferDestroy(directionalLightIntensityBuffer);
     gprtBufferDestroy(directionalLightDirBuffer);
     gprtBufferDestroy(vertexBuffer);
     gprtBufferDestroy(normalBuffer);
     gprtBufferDestroy(indexBuffer);
+    gprtBufferDestroy(materialTypeBuffer);
     gprtBufferDestroy(metalAlbedoBuffer);
     gprtBufferDestroy(metalFuzzBuffer);
     gprtBufferDestroy(lambertianBuffer);

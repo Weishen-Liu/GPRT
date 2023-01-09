@@ -44,6 +44,7 @@ struct TrianglesGeomData
     /*! array/buffer of color */
     alignas(16) gprt::Buffer color; // vec3f *
 
+    alignas(16) gprt::Buffer material_type; // vec3f *
     alignas(16) gprt::Buffer lambertian; // vec3f *
     alignas(16) gprt::Buffer metal_albedo;      // vec3f *
     alignas(16) gprt::Buffer metal_fuzz;      // vec3f *
@@ -60,7 +61,7 @@ struct RayGenData
     alignas(8) int2 fbSize;
     alignas(16) gprt::Accel world;
 
-    alignas(16) gprt::Buffer ambient_lights;
+    alignas(16) gprt::Buffer ambient_lights_intensity;
     alignas(16) int ambient_light_size;
 
     alignas(16) gprt::Buffer directional_lights_intensity;
