@@ -162,14 +162,12 @@ void loadModel(
         if (random() < random()) {
             // Lambertian
             material_index = 0;
+        } else if (random() > random()) {
+            // Metal
+            material_index = 1;
         } else {
-            if (random() < random()) {
-                // Metal
-                material_index = 1;
-            } else {
-                // Dielectric
-                material_index = 2;
-            }
+            // Dielectric
+            material_index = 2;
         }
     }
     
