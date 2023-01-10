@@ -73,10 +73,10 @@ extern GPRTProgram new_example_deviceCode;
 
 
 const std::vector<std::string> MODEL_PATH = {
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
-    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
+    "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
-    "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
+    // "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
     // "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"
@@ -89,7 +89,7 @@ std::vector<float3> list_of_vertices;
 std::vector<float3> list_of_colors;
 std::vector<float3> list_of_vertex_normals;
 std::vector<float4x4> list_of_transform = {
-    // translation_matrix(float3(0.0f, 0.0f, 1.1f)),
+    translation_matrix(float3(0.0f, 0.0f, 1.1f)),
     translation_matrix(float3(0.0f, 0.0f, 0.0f)),
     translation_matrix(float3(0.344626f,12.9949f,-0.114619f)),
     translation_matrix(float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f)),
@@ -105,13 +105,21 @@ std::vector<float3> list_of_directional_lights_direction;
 
 // Materials
 std::vector<int> material_types {
-    // 1, // viking_room
-    // 2, // Cube
+    0, // viking_room
+    2, // Cube
     // 1, // Mario
-    0, // bunny
+    // 0, // bunny
     // 0, // sphere
     // 0, // sponza
-    // 0 // horse
+    // 0, // horse
+
+    // -1, // viking_room
+    // -1, // Cube
+    // -1, // Mario
+    // -1, // bunny
+    // -1, // sphere
+    // -1, // sponza
+    // -1 // horse
 };
 std::vector<int> list_of_material_type;
 std::vector<Lambertian> list_of_lambertians;
@@ -173,7 +181,7 @@ int main(int ac, char **av)
     // ------------------------------------------------------------------
     int each_material_type = -1;
     for (int each_path = 0; each_path < MODEL_PATH.size(); each_path++) {
-        int each_material_type = material_types[each_path];
+        each_material_type = material_types[each_path];
         loadModel(
             MODEL_PATH[each_path],
             list_of_vertices,

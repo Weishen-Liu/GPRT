@@ -46,10 +46,10 @@
 #define M_PI 3.1415926f
 #endif
 
-#define BIDIRECTION true
+#define BIDIRECTION false
 #define TOTAL_SAMPLE_PER_PIXEL 100
 #define RAY_DEPTH 20
-#define LIGHT_SAMPLE_TIMES 100
+#define LIGHT_SAMPLE_TIMES 20
 #define CAMERA_SAMPLE_TIMES 3
 
 uint rand_init(uint val0, uint val1)
@@ -166,8 +166,8 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
     float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, each_light);
     float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
     rayDesc.Origin = lastScatterResult.scatteredOrigin;
-    rayDesc.Direction = -directionalLightDir;
-    if (dot(lastScatterResult.normal, rayDesc.Direction) < 0) {
+    rayDesc.Direction = normalize(-directionalLightDir);
+    if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
       continue;
     }
     TraceRay(
@@ -206,7 +206,7 @@ float3 connection_with_first_hit(
   RayDesc rayDesc;
   rayDesc.Origin = lastScatterResult.scatteredOrigin;
   rayDesc.Direction = camera_hit_scatter_result.scatteredOrigin - lastScatterResult.scatteredOrigin;
-  if (dot(lastScatterResult.normal, rayDesc.Direction) < 0) {
+  if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
     return connect_to_first_hit_color;
   }
   rayDesc.TMin = 1e-3f;
