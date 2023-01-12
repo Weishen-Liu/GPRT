@@ -153,37 +153,37 @@ static float3 russian_roulette(int scatter_index, float3 attenuation)
 float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record, ScatterResult lastScatterResult, float3 attenuation) {
   float3 total_lights_color = float3(0.f, 0.f, 0.f);
 
-  // for (int each_light = 0; each_light < record.ambient_light_size; each_light++) {
-  //   float3 ambientLightIntensity = gprt::load<float3>(record.ambient_lights_intensity, each_light);
-  //   total_lights_color += ambientLightIntensity * attenuation;
-  // }
-
-  Payload payload;
-  RayDesc rayDesc;
-  rayDesc.TMin = 1e-3f;
-  rayDesc.TMax = 1e10f;
-  for (int each_light = 0; each_light < record.directional_light_size; each_light++) {
-    float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, each_light);
-    float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
-    rayDesc.Origin = lastScatterResult.scatteredOrigin;
-    rayDesc.Direction = normalize(-directionalLightDir);
-    if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
-      continue;
-    }
-    TraceRay(
-      world, // the tree
-      RAY_FLAG_FORCE_OPAQUE, // ray flags
-      0xff, // instance inclusion mask
-      0, // ray type
-      1, // number of ray types
-      0, // miss type
-      rayDesc, // the ray to trace
-      payload // the payload IO
-    );
-    if (payload.scatterResult.scatterEvent == 2) {
-      total_lights_color += directionalLightIntensity * attenuation;
-    }
+  for (int each_light = 0; each_light < record.ambient_light_size; each_light++) {
+    float3 ambientLightIntensity = gprt::load<float3>(record.ambient_lights_intensity, each_light);
+    total_lights_color += ambientLightIntensity * attenuation;
   }
+
+  // Payload payload;
+  // RayDesc rayDesc;
+  // rayDesc.TMin = 1e-3f;
+  // rayDesc.TMax = 1e10f;
+  // for (int each_light = 0; each_light < record.directional_light_size; each_light++) {
+  //   float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, each_light);
+  //   float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
+  //   rayDesc.Origin = lastScatterResult.scatteredOrigin;
+  //   rayDesc.Direction = normalize(-directionalLightDir);
+  //   if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
+  //     continue;
+  //   }
+  //   TraceRay(
+  //     world, // the tree
+  //     RAY_FLAG_FORCE_OPAQUE, // ray flags
+  //     0xff, // instance inclusion mask
+  //     0, // ray type
+  //     1, // number of ray types
+  //     0, // miss type
+  //     rayDesc, // the ray to trace
+  //     payload // the payload IO
+  //   );
+  //   if (payload.scatterResult.scatterEvent == 2) {
+  //     total_lights_color += directionalLightIntensity * attenuation;
+  //   }
+  // }
 
   return total_lights_color;
 }
@@ -318,7 +318,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 {
   float3 total_payload_color = float3(0.f, 0.f, 0.f);
   uint2 pixelID = DispatchRaysIndex().xy;
-  float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(record.fbSize);
+  uint2 fbSize = DispatchRaysDimensions().xy;
+  float2 screen = (float2(pixelID) + float2(.5f, .5f)) / float2(fbSize);
 
   if (BIDIRECTION) {
     for (int each_sample = 0; each_sample < TOTAL_SAMPLE_PER_PIXEL; each_sample++)
@@ -328,7 +329,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       RayDesc rayDesc;
       payload.rand = rand_generate(payload.rand, 2);
       rayDesc.Origin = record.camera.pos;
-      rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(record.fbSize).x - 1);
+      rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(fbSize).x - 1);
       rayDesc.Direction = 
         normalize(record.camera.dir_00
         + screen.x * record.camera.dir_du
@@ -374,12 +375,12 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       }
     }
 
-    const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
+    const int fbOfs = pixelID.x + fbSize.x * pixelID.y;
     if (record.accId) {
       total_payload_color = total_payload_color + gprt::load<float3>(record.accBuffer, fbOfs);
     }
     gprt::store(record.accBuffer, fbOfs, total_payload_color);
-    gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
+    gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
 
   } else {
     for (int each_sample = 0; each_sample < TOTAL_SAMPLE_PER_PIXEL; each_sample++)
@@ -389,7 +390,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       RayDesc rayDesc;
       payload.rand = rand_generate(payload.rand, 2);
       rayDesc.Origin = record.camera.pos;
-      rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(record.fbSize).x - 1);
+      rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(fbSize).x - 1);
       rayDesc.Direction = 
         normalize(record.camera.dir_00
         + screen.x * record.camera.dir_du
@@ -436,12 +437,14 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       }
     }
 
-    const int fbOfs = pixelID.x + record.fbSize.x * pixelID.y;
+    const int fbOfs = pixelID.x + fbSize.x * pixelID.y;
     if (record.accId) {
       total_payload_color = total_payload_color + gprt::load<float3>(record.accBuffer, fbOfs);
     }
     gprt::store(record.accBuffer, fbOfs, total_payload_color);
-    gprt::store(record.fbPtr, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
+    // GPRT load color with BGR format, not RGB
+    float3 reverse_total_color = float3(total_payload_color.z, total_payload_color.y, total_payload_color.x);
+    gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(reverse_total_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
   }
 }
 

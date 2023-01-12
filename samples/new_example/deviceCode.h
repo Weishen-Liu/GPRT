@@ -56,9 +56,8 @@ struct RayGenData
     alignas(16) gprt::Buffer accBuffer;
     alignas(16) int accId;
 
-    alignas(16) gprt::Buffer fbPtr;
+    alignas(16) gprt::Buffer frameBuffer;
 
-    alignas(8) int2 fbSize;
     alignas(16) gprt::Accel world;
 
     alignas(16) gprt::Buffer ambient_lights_intensity;
