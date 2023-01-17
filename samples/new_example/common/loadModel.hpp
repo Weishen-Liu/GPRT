@@ -15,8 +15,10 @@
 #include <string>
 #include <unordered_map>
 
+#ifndef TINYOBJLOADER_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+#endif
 
 #ifndef   INCLUDE_LIGHTS
 #define   INCLUDE_LIGHTS

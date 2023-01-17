@@ -97,7 +97,10 @@ ENDIF()
 add_subdirectory(vma)
 
 # Find STB Image
-add_subdirectory(stb_image)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/stb_image EXCLUDE_FROM_ALL)
+
+# Find ImGUi
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
 
 # Find Tiny Obj
 add_subdirectory(tinyobj)

@@ -34,7 +34,7 @@
 
 #ifndef   INCLUDE_MATERIAL
 #define   INCLUDE_MATERIAL
-#include "./materials/material.hpp"
+#include "./common/material.hpp"
 #endif
 
 #ifndef   INCLUDE_LIGHTS
@@ -443,8 +443,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     }
     gprt::store(record.accBuffer, fbOfs, total_payload_color);
     // GPRT load color with BGR format, not RGB
-    float3 reverse_total_color = float3(total_payload_color.z, total_payload_color.y, total_payload_color.x);
-    gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(reverse_total_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
+    // float3 reverse_total_color = float3(total_payload_color.z, total_payload_color.y, total_payload_color.x);
+    gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
   }
 }
 
