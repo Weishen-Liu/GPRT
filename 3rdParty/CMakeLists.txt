@@ -94,10 +94,13 @@ ELSE()
 ENDIF()
 
 # Find STB Image
-add_subdirectory(stb_image)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/stb_image EXCLUDE_FROM_ALL)
+
+# Find ImGUi
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
 
 # Find OBJ file loader
-add_subdirectory(tiny_obj_loader)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tiny_obj_loader EXCLUDE_FROM_ALL)
 
 # Find GLFW
 if(GPRT_BUILD_SAMPLES)
