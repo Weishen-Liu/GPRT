@@ -30,8 +30,6 @@
 #include "./materials/material.hpp"
 #endif
 
-#include "./math/random.h"
-
 struct Vertex
 {
     float3 pos;
@@ -84,20 +82,22 @@ namespace std {
 }
 
 void loadModel(
-    const std::string obj_path,
+    Obj& obj,
     std::vector<float3>& list_of_vertices,
     std::vector<int3>& list_of_indices,
     std::vector<float3>& list_of_colors,
     std::vector<float3>&list_of_vertex_normals,
-    int material_type,
     std::vector<int>&list_of_material_type,
-    std::vector<Lambertian>&list_of_lambertians,
+    std::vector<float3>&list_of_lambertians,
     std::vector<float3>&list_of_metals_albedo,
     std::vector<float>&list_of_metals_fuzz,
-    std::vector<Dielectric>&list_of_dielectrics,
-    float4x4 transform
-)
-{
+    std::vector<float>&list_of_dielectrics
+){
+    std::string obj_path = obj.path;
+    Material obj_material = obj.material;
+    std::string material_type = obj_material.type;
+    float4x4 transform = translation_matrix(obj.transform);
+
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -149,46 +149,26 @@ void loadModel(
             indices.push_back(uniqueVertices[vertex]);
         }
     }
-
-    owl::common::LCG<4> random;
-    random.init(0, 1);
-    float3 lambertian_color = float3(random(), random(), random());
-    float3 metal_color = float3(random(), random(), random());
-    float metal_fuzz = random();
-    float dielectric_ref_idx = random();
-
-    int material_index = 0;
-    if (material_type != -1) {
-        material_index = material_type;
-    } else {
-        if (random() < random()) {
-            // Lambertian
-            material_index = 0;
-        } else if (random() > random()) {
-            // Metal
-            material_index = 1;
-        } else {
-            // Dielectric
-            material_index = 2;
-        }
-    }
     
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
 
-        Lambertian lambertian;
-        lambertian.albedo = lambertian_color;
-        list_of_lambertians.push_back(lambertian);
+        list_of_lambertians.push_back(obj_material.lambertian.albedo);
 
-        list_of_metals_albedo.push_back(metal_color);
-        list_of_metals_fuzz.push_back(metal_fuzz);
+        list_of_metals_albedo.push_back(obj_material.metal.albedo);
+        list_of_metals_fuzz.push_back(obj_material.metal.fuzz);
 
-        Dielectric dielectric;
-        dielectric.ref_idx = dielectric_ref_idx;
-        list_of_dielectrics.push_back(dielectric);
+        list_of_dielectrics.push_back(obj_material.dielectric.ref_idx);
 
-        list_of_material_type.push_back(material_index);
+        for (int each_material = 0; each_material < ALL_MATERIALS.size(); each_material++)
+        {
+            if (material_type == ALL_MATERIALS[each_material])
+            {
+                list_of_material_type.push_back(each_material);
+                break;
+            }
+        }
     }
 }
 
@@ -198,8 +178,33 @@ void loadLights(
     std::vector<float3>& list_of_directional_lights_dir
 )
 {
-    list_of_ambient_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
+    for (int each_ambient_light; each_ambient_light < LIST_OF_AMBIENT_LIGHTS.size(); each_ambient_light++) {
+        if (LIST_OF_AMBIENT_LIGHTS[each_ambient_light].choosed == false)
+        {
+            continue;
+        }
+        list_of_ambient_lights_intensity.push_back(LIST_OF_AMBIENT_LIGHTS[each_ambient_light].intensity);
+    }
 
-    list_of_directional_lights_intensity.push_back(float3(1.f, 1.f, 1.f));
-    list_of_directional_lights_dir.push_back(float3(0.f, 1.f, 0.f));
+    // Check If Ambient Light Disable
+    if (list_of_ambient_lights_intensity.size() == 0)
+    {
+        list_of_ambient_lights_intensity.push_back(float3(0.f, 0.f, 0.f));
+    }
+
+    for (int each_directional_light; each_directional_light < LIST_OF_DIRECTIONAL_LIGHTS.size(); each_directional_light++) {
+        if (LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].choosed == false)
+        {
+            continue;
+        }
+        list_of_directional_lights_intensity.push_back(LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].intensity);
+        list_of_directional_lights_dir.push_back(LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].direction);
+    }
+
+    // Check If Directional Light Disable
+    if (list_of_directional_lights_intensity.size() == 0)
+    {
+        list_of_directional_lights_intensity.push_back(float3(0.f, 0.f, 0.f));
+        list_of_directional_lights_dir.push_back(float3(1.f, 0.f, 0.f));
+    }
 }
