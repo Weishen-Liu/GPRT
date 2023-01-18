@@ -37,10 +37,10 @@
 #include "./common/material.hpp"
 #endif
 
-#ifndef   INCLUDE_LIGHTS
-#define   INCLUDE_LIGHTS
-#include "./common/lights.hpp"
-#endif
+// #ifndef   INCLUDE_LIGHTS
+// #define   INCLUDE_LIGHTS
+// #include "./common/lights.hpp"
+// #endif
 
 #ifndef M_PI
 #define M_PI 3.1415926f
@@ -158,32 +158,32 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
     total_lights_color += ambientLightIntensity * attenuation;
   }
 
-  // Payload payload;
-  // RayDesc rayDesc;
-  // rayDesc.TMin = 1e-3f;
-  // rayDesc.TMax = 1e10f;
-  // for (int each_light = 0; each_light < record.directional_light_size; each_light++) {
-  //   float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, each_light);
-  //   float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
-  //   rayDesc.Origin = lastScatterResult.scatteredOrigin;
-  //   rayDesc.Direction = normalize(-directionalLightDir);
-  //   if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
-  //     continue;
-  //   }
-  //   TraceRay(
-  //     world, // the tree
-  //     RAY_FLAG_FORCE_OPAQUE, // ray flags
-  //     0xff, // instance inclusion mask
-  //     0, // ray type
-  //     1, // number of ray types
-  //     0, // miss type
-  //     rayDesc, // the ray to trace
-  //     payload // the payload IO
-  //   );
-  //   if (payload.scatterResult.scatterEvent == 2) {
-  //     total_lights_color += directionalLightIntensity * attenuation;
-  //   }
-  // }
+  Payload payload;
+  RayDesc rayDesc;
+  rayDesc.TMin = 1e-3f;
+  rayDesc.TMax = 1e10f;
+  for (int each_light = 0; each_light < record.directional_light_size; each_light++) {
+    float3 directionalLightIntensity = gprt::load<float3>(record.directional_lights_intensity, each_light);
+    float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
+    rayDesc.Origin = lastScatterResult.scatteredOrigin;
+    rayDesc.Direction = normalize(-directionalLightDir);
+    if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
+      continue;
+    }
+    TraceRay(
+      world, // the tree
+      RAY_FLAG_FORCE_OPAQUE, // ray flags
+      0xff, // instance inclusion mask
+      0, // ray type
+      1, // number of ray types
+      0, // miss type
+      rayDesc, // the ray to trace
+      payload // the payload IO
+    );
+    if (payload.scatterResult.scatterEvent == 2) {
+      total_lights_color += directionalLightIntensity * attenuation;
+    }
+  }
 
   return total_lights_color;
 }
@@ -621,7 +621,8 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   int material_type = gprt::load<int>(record.material_type, primID);
   if (material_type == 0) {
     // Lambertian
-    Lambertian lambertian = gprt::load<Lambertian>(record.lambertian, primID);
+    Lambertian lambertian;
+    lambertian.albedo = gprt::load<float3>(record.lambertian, primID);
     payload.scatterResult = scatter(lambertian, targetPoint, normal, payload);
   } else if (material_type == 1) {
     // Metal
@@ -631,7 +632,8 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
     payload.scatterResult = scatter(metal, targetPoint, normal, payload);
   } else if (material_type == 2) {
     // Dielectric
-    Dielectric dielectric = gprt::load<Dielectric>(record.dielectric, primID);
+    Dielectric dielectric;
+    dielectric.ref_idx = gprt::load<float>(record.dielectric, primID);
     payload.scatterResult = scatter(dielectric, targetPoint, normal, payload);
   }
 }

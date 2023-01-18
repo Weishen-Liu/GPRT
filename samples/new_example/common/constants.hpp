@@ -40,29 +40,12 @@ std::vector<float3> list_of_directional_lights_intensity = {};
 std::vector<float3> list_of_directional_lights_direction = {};
 
 // Materials
-std::vector<int> material_types{
-    // 0, // viking_room
-    // 2, // Cube
-    // 1, // Mario
-    // 0, // bunny
-    // 0, // sphere
-    // 0, // sponza
-    // 0, // horse
-
-    -1, // viking_room
-    -1, // Cube
-    -1, // Mario
-    -1, // bunny
-    -1, // sphere
-    -1, // sponza
-    -1 // horse
-};
 std::vector<int> list_of_material_type = {};
-std::vector<Lambertian> list_of_lambertians = {};
+std::vector<float3> list_of_lambertians = {};
 std::vector<Metal> list_of_metals = {};
 std::vector<float3> list_of_metals_albedo = {};
 std::vector<float> list_of_metals_fuzz = {};
-std::vector<Dielectric> list_of_dielectrics = {};
+std::vector<float> list_of_dielectrics = {};
 
 // initial image resolution
 const int2 fbSize = {800, 600};
@@ -78,7 +61,15 @@ float cosFovy = 20.f;
 // ImGUI
 float imgui_test_input = 0.f;
 static const char* current_item = NULL;
+static const char* current_item_material = NULL;
 int current_item_index = -1;
+
+struct CurrentLight
+{
+    const char* name = NULL;
+    const char* type = NULL;
+    int index = -1;
+}current_light;
 
 const std::vector<std::string> ALL_MODEL_NAME = {
     "Viking Room",
@@ -110,12 +101,37 @@ std::vector<float3> INITIAL_TRANSFORM = {
     float3(0.0f, 0.0f, -4.0f)
 };
 
+const std::vector<std::string> ALL_MATERIALS = {
+    "Lambertian",
+    "Metal",
+    "Dielectric"
+};
+
+struct Material
+{
+  const char* type;
+  Lambertian lambertian;
+  Metal metal;
+  Dielectric dielectric;
+};
+
 struct Obj {
     std::string name;
     std::string path;
     bool choosed = false;
     float3 transform;
+    Material material;
 };
 
 std::vector<Obj> LIST_OF_OBJS;
 int SELECTED_OBJS = 1;
+
+// Lights
+const std::vector<std::string> ALL_LIGHTS = {
+    "Ambient",
+    "Directional"
+};
+
+std::vector<AmbientLight> LIST_OF_AMBIENT_LIGHTS;
+std::vector<DirectionalLight> LIST_OF_DIRECTIONAL_LIGHTS;
+int SELECTED_LIGHTS = 0;

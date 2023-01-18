@@ -54,10 +54,10 @@ struct VulkanResources {
     GPRTBufferOf<float3> normalBuffer;
     GPRTBufferOf<float3> colorBuffer;
     GPRTBufferOf<int> materialTypeBuffer;
-    GPRTBufferOf<Lambertian> lambertianBuffer;
+    GPRTBufferOf<float3> lambertianBuffer;
     GPRTBufferOf<float3> metalAlbedoBuffer;
     GPRTBufferOf<float> metalFuzzBuffer;
-    GPRTBufferOf<Dielectric> dielectricBuffer;
+    GPRTBufferOf<float> dielectricBuffer;
     GPRTBufferOf<float3> accBuffer;
     GPRTBufferOf<uint32_t> frameBuffer;
 
@@ -84,7 +84,6 @@ void VulkanResources::createGeometry() {
     // triangle mesh
     // ------------------------------------------------------------------
 
-    int each_material_type = -1;
     for (int each_path = 0; each_path < LIST_OF_OBJS.size(); each_path++)
     {
         if (LIST_OF_OBJS[each_path].choosed == false)
@@ -92,30 +91,36 @@ void VulkanResources::createGeometry() {
             continue;
         }
 
-        each_material_type = material_types[each_path];
         loadModel(
-            LIST_OF_OBJS[each_path].path,
+            LIST_OF_OBJS[each_path],
             list_of_vertices,
             list_of_indices,
             list_of_colors,
             list_of_vertex_normals,
-            each_material_type,
             list_of_material_type,
             list_of_lambertians,
             list_of_metals_albedo,
             list_of_metals_fuzz,
-            list_of_dielectrics,
-            translation_matrix(LIST_OF_OBJS[each_path].transform));
+            list_of_dielectrics);
     }
     vertexBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertices.size(), static_cast<const void *>(list_of_vertices.data()));
     indexBuffer = gprtDeviceBufferCreate<int3>(context, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
     normalBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
     colorBuffer = gprtDeviceBufferCreate<float3>(context, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
+    std::cout<<"here1"<<std::endl;
     materialTypeBuffer = gprtDeviceBufferCreate<int>(context, list_of_material_type.size(), static_cast<const void *>(list_of_material_type.data()));
-    lambertianBuffer = gprtDeviceBufferCreate<Lambertian>(context, list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
+    std::cout<<"here2"<<std::endl;
+    
+    lambertianBuffer = gprtDeviceBufferCreate<float3>(context, list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
+    std::cout<<"here3"<<std::endl;
+    
     metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(context, list_of_metals_albedo.size(), static_cast<const void *>(list_of_metals_albedo.data()));
+    std::cout<<"here4"<<std::endl;
+    
     metalFuzzBuffer = gprtDeviceBufferCreate<float>(context, list_of_metals_fuzz.size(), static_cast<const void *>(list_of_metals_fuzz.data()));
-    dielectricBuffer = gprtDeviceBufferCreate<Dielectric>(context, list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
+    std::cout<<"here5"<<std::endl;
+    
+    dielectricBuffer = gprtDeviceBufferCreate<float>(context, list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
     accBuffer = gprtDeviceBufferCreate<float3>(context, fbSize.x * fbSize.y);
     frameBuffer = gprtHostBufferCreate<uint32_t>(context, fbSize.x * fbSize.y);
 
