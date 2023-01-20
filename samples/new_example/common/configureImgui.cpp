@@ -66,32 +66,12 @@ void ConfigureImgui::addObj()
                         current_item = NULL;
                         current_item_index = -1;
                     }
-                    if (SELECTED_OBJS == 1) {
-                        // Need to at least render one objs
-                        objCountWarning = true;
-                        LIST_OF_OBJS[i].choosed = true;
-                        break;
-                    } else {
-                        SELECTED_OBJS -= 1;
-                    }
+                    SELECTED_OBJS -= 1;
                 } else {
                     SELECTED_OBJS += 1;
-                    objCountWarning = false;
                 }
             }
         }
-        ImGui::End();
-
-        showSelectedObjCountWarning();
-    }
-}
-
-void ConfigureImgui::showSelectedObjCountWarning()
-{
-    if (objCountWarning)
-    {
-        ImGui::Begin("Warning", &objCountWarning);
-        ImGui::Text("Cannot uncheck this one.\nNeed to render at least one obj");
         ImGui::End();
     }
 }

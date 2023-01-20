@@ -61,9 +61,9 @@ namespace std {
 }
 
 void VulkanResources::createGeometry() {
-    trianglesGeomType = gprtGeomTypeCreate<TrianglesGeomData>(
-        context, GPRT_TRIANGLES);
+    trianglesGeomType = gprtGeomTypeCreate<TrianglesGeomData>(context, GPRT_TRIANGLES);
     gprtGeomTypeSetClosestHitProg(trianglesGeomType, 0, module, "TriangleMesh");
+    trianglesGeom = gprtGeomCreate<TrianglesGeomData>(context, trianglesGeomType);
 
     // ------------------------------------------------------------------
     // triangle mesh
@@ -88,28 +88,29 @@ void VulkanResources::createGeometry() {
             list_of_metals_fuzz,
             list_of_dielectrics);
     }
-    vertexBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertices.size(), static_cast<const void *>(list_of_vertices.data()));
-    indexBuffer = gprtDeviceBufferCreate<int3>(context, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
-    normalBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
-    colorBuffer = gprtDeviceBufferCreate<float3>(context, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
-    materialTypeBuffer = gprtDeviceBufferCreate<int>(context, list_of_material_type.size(), static_cast<const void *>(list_of_material_type.data()));
-    lambertianBuffer = gprtDeviceBufferCreate<float3>(context, list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
-    metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(context, list_of_metals_albedo.size(), static_cast<const void *>(list_of_metals_albedo.data()));
-    metalFuzzBuffer = gprtDeviceBufferCreate<float>(context, list_of_metals_fuzz.size(), static_cast<const void *>(list_of_metals_fuzz.data()));
-    dielectricBuffer = gprtDeviceBufferCreate<float>(context, list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
-    accBuffer = gprtDeviceBufferCreate<float3>(context, configureImgui.fbSize.x * configureImgui.fbSize.y);
-    frameBuffer = gprtHostBufferCreate<uint32_t>(context, configureImgui.fbSize.x * configureImgui.fbSize.y);
 
-    trianglesGeom = gprtGeomCreate<TrianglesGeomData>(context, trianglesGeomType);
-    gprtTrianglesSetVertices(trianglesGeom, vertexBuffer,
-                             list_of_vertices.size());
-    gprtTrianglesSetIndices(trianglesGeom, indexBuffer,
-                            list_of_indices.size());
+    if (list_of_vertices.size() > 0) {
+        vertexBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertices.size(), static_cast<const void *>(list_of_vertices.data()));
+        indexBuffer = gprtDeviceBufferCreate<int3>(context, list_of_indices.size(), static_cast<const void *>(list_of_indices.data()));
+        normalBuffer = gprtDeviceBufferCreate<float3>(context, list_of_vertex_normals.size(), static_cast<const void *>(list_of_vertex_normals.data()));
+        colorBuffer = gprtDeviceBufferCreate<float3>(context, list_of_colors.size(), static_cast<const void *>(list_of_colors.data()));
+        materialTypeBuffer = gprtDeviceBufferCreate<int>(context, list_of_material_type.size(), static_cast<const void *>(list_of_material_type.data()));
+        lambertianBuffer = gprtDeviceBufferCreate<float3>(context, list_of_lambertians.size(), static_cast<const void *>(list_of_lambertians.data()));
+        metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(context, list_of_metals_albedo.size(), static_cast<const void *>(list_of_metals_albedo.data()));
+        metalFuzzBuffer = gprtDeviceBufferCreate<float>(context, list_of_metals_fuzz.size(), static_cast<const void *>(list_of_metals_fuzz.data()));
+        dielectricBuffer = gprtDeviceBufferCreate<float>(context, list_of_dielectrics.size(), static_cast<const void *>(list_of_dielectrics.data()));
+        accBuffer = gprtDeviceBufferCreate<float3>(context, configureImgui.fbSize.x * configureImgui.fbSize.y);
+        frameBuffer = gprtHostBufferCreate<uint32_t>(context, configureImgui.fbSize.x * configureImgui.fbSize.y);
+    }
+
+    gprtTrianglesSetVertices(trianglesGeom, vertexBuffer, list_of_vertices.size());
+    gprtTrianglesSetIndices(trianglesGeom, indexBuffer, list_of_indices.size());
 
     geomData = gprtGeomGetPointer(trianglesGeom);
     geomData->vertex = gprtBufferGetHandle(vertexBuffer);
-    geomData->normal = gprtBufferGetHandle(normalBuffer);
     geomData->index = gprtBufferGetHandle(indexBuffer);
+
+    geomData->normal = gprtBufferGetHandle(normalBuffer);
     geomData->color = gprtBufferGetHandle(colorBuffer);
     geomData->material_type = gprtBufferGetHandle(materialTypeBuffer);
     geomData->metal_albedo = gprtBufferGetHandle(metalAlbedoBuffer);
@@ -190,22 +191,26 @@ void VulkanResources::createMiss() {
 
 void VulkanResources::createRayGen() {
     rayGen = gprtRayGenCreate<RayGenData>(context, module, "simpleRayGen");
-
+    rayGenData = gprtRayGenGetPointer(rayGen);
     // ----------- create lights  ----------------------------
     loadLights(
         list_of_ambient_lights_intensity,
         list_of_directional_lights_intensity,
         list_of_directional_lights_direction);
 
-    ambientLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
+    if (list_of_ambient_lights_intensity.size() > 0) {
+        ambientLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
         context, list_of_ambient_lights_intensity.size(), static_cast<const void *>(list_of_ambient_lights_intensity.data()));
-    directionalLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
-        context, list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data()));
-    directionalLightDirBuffer = gprtDeviceBufferCreate<float3>(
-        context, list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data()));
+    }
+
+    if (list_of_directional_lights_intensity.size() > 0) {
+        directionalLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
+            context, list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data()));
+        directionalLightDirBuffer = gprtDeviceBufferCreate<float3>(
+            context, list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data()));
+    }
 
     // ----------- set variables  ----------------------------
-    rayGenData = gprtRayGenGetPointer(rayGen);
     rayGenData->frameBuffer = gprtBufferGetHandle(frameBuffer);
     rayGenData->world = gprtAccelGetHandle(world);
     rayGenData->accBuffer = gprtBufferGetHandle(accBuffer);
@@ -347,12 +352,6 @@ void VulkanResources::loadLights(
         list_of_ambient_lights_intensity.push_back(configureImgui.LIST_OF_AMBIENT_LIGHTS[each_ambient_light].intensity);
     }
 
-    // Check If Ambient Light Disable
-    if (list_of_ambient_lights_intensity.size() == 0)
-    {
-        list_of_ambient_lights_intensity.push_back(float3(0.f, 0.f, 0.f));
-    }
-
     for (int each_directional_light; each_directional_light < configureImgui.LIST_OF_DIRECTIONAL_LIGHTS.size(); each_directional_light++) {
         if (configureImgui.LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].choosed == false)
         {
@@ -360,13 +359,6 @@ void VulkanResources::loadLights(
         }
         list_of_directional_lights_intensity.push_back(configureImgui.LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].intensity);
         list_of_directional_lights_dir.push_back(configureImgui.LIST_OF_DIRECTIONAL_LIGHTS[each_directional_light].direction);
-    }
-
-    // Check If Directional Light Disable
-    if (list_of_directional_lights_intensity.size() == 0)
-    {
-        list_of_directional_lights_intensity.push_back(float3(0.f, 0.f, 0.f));
-        list_of_directional_lights_dir.push_back(float3(1.f, 0.f, 0.f));
     }
 }
 
