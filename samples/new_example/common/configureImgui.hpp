@@ -71,7 +71,7 @@ struct ConfigureImgui {
     };
 
     std::vector<Obj> LIST_OF_OBJS;
-    int SELECTED_OBJS = 1;
+    int SELECTED_OBJS = 0;
 
     const std::vector<std::string> ALL_MATERIALS = {
         "Lambertian",

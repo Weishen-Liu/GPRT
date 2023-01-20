@@ -75,7 +75,8 @@ struct VulkanResources {
 
     void initialVulkanResources(GPRTProgram new_example_deviceCode);
     void resetVulkanGeometryResources(GPRTProgram new_example_deviceCode);
-    void createGeometry();
+    void updateVulkanResources();
+    void createGeometry(int each_path);
     void createAccel();
     void createMiss();
     void createRayGen();
