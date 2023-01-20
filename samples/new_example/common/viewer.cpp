@@ -1,22 +1,16 @@
-#ifndef INCLUDE_VIEWER_H
-#define INCLUDE_VIEWER_H
 #include "./viewer.hpp"
-#endif
 
-#ifndef INCLUDE_CONTANTS
-#define INCLUDE_CONTANTS
-#include "./constants.hpp"
-#endif
-
-#ifndef INCLUDE_CONFIGUREIMGUI
-#define INCLUDE_CONFIGUREIMGUI
-#include "./configureImgui.cpp"
-#endif
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl2.h>
 
 #ifndef M_PI
 #define M_PI 3.1415926f
 #endif
 
+#define ARCBALL true
+
+#include <iostream>
 #include <cstring>
 #include <string>
 
@@ -141,7 +135,7 @@ inline owl::common::Quaternion3f Viewer::rotation(const owl::common::linear3f &a
 void Viewer::mouseButtonLeft(const int2 &where, bool pressed)
 {
     std::cout << "Left Click" << std::endl;
-    if (Arcball && pressed)
+    if (ARCBALL && pressed)
     {
         if (abs(arcball.rotation) < 1e-8f)
         {
@@ -211,8 +205,8 @@ void Viewer::rotate(const float deg_u, const float deg_v)
 
 float3 Viewer::arcballProject(const int2 &where)
 {
-    int width = fbSize.x;
-    int height = fbSize.y;
+    int width = vulkanResources.configureImgui.fbSize.x;
+    int height = vulkanResources.configureImgui.fbSize.y;
 
     float3 v(0.f, 0.f, 0.f);
 
@@ -236,7 +230,7 @@ float3 Viewer::arcballProject(const int2 &where)
 
 void Viewer::mouseDragLeft(const int2 &where, const int2 &delta)
 {
-    if (Arcball)
+    if (ARCBALL)
     {
         float3 curr_pos = arcballProject(where + delta);
         float3 from = normalize(arcball.down_pos);
@@ -264,7 +258,7 @@ void Viewer::mouseDragLeft(const int2 &where, const int2 &delta)
     }
     else
     {
-        const float2 fraction = float2(delta) / float2(fbSize);
+        const float2 fraction = float2(delta) / float2(vulkanResources.configureImgui.fbSize);
         rotate(fraction.x * degrees_per_drag_fraction,
                fraction.y * degrees_per_drag_fraction);
     }
@@ -285,7 +279,7 @@ void Viewer::move(const float step)
   pixels, at last position where */
 void Viewer::mouseDragRight(const int2 &where, const int2 &delta)
 {
-    const float2 fraction = float2(delta) / float2(fbSize);
+    const float2 fraction = float2(delta) / float2(vulkanResources.configureImgui.fbSize);
     move(fraction.y * pixels_per_move);
 }
 
@@ -314,7 +308,7 @@ void Viewer::key(int key, const int2 &where)
         glfwSetWindowShouldClose(handle, GLFW_TRUE);
         break;
     case GLFW_KEY_G:
-        configureImgui.showImgui = !configureImgui.showImgui;
+        vulkanResources.configureImgui.showImgui = !vulkanResources.configureImgui.showImgui;
         break;
     case GLFW_KEY_UP:
         std::cout << "Up Key Pressed" << std::endl;
@@ -329,8 +323,8 @@ void Viewer::init(GPRTProgram new_example_deviceCode)
                             lookAt,
                             lookUp,
                             cosFovy);
-    configureImgui.initObj();
-    configureImgui.initLight();
+    vulkanResources.configureImgui.initObj();
+    vulkanResources.configureImgui.initLight();
     deviceCode = new_example_deviceCode;
     vulkanResources.initialVulkanResources(new_example_deviceCode);
 }
@@ -344,7 +338,7 @@ void Viewer::initWindow()
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    GLFWwindow *window = glfwCreateWindow(fbSize.x, fbSize.y, "New Example", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(vulkanResources.configureImgui.fbSize.x, vulkanResources.configureImgui.fbSize.y, "New Example", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -400,7 +394,7 @@ void Viewer::recalculateCamera()
     camera.toString();
     // ........... compute variable values  ..................
     const float3 vup = newlookUp;
-    const float aspect = fbSize.x / float(fbSize.y);
+    const float aspect = vulkanResources.configureImgui.fbSize.x / float(vulkanResources.configureImgui.fbSize.y);
     const float theta = vfov * ((float)M_PI) / 180.0f;
     const float half_height = tanf(theta / 2.0f);
     const float half_width = aspect * half_height;
@@ -427,16 +421,16 @@ void Viewer::run()
         if (camera.lastModified || firstFrame)
         {
             camera.lastModified = false;
-            accId = 0;
+            vulkanResources.configureImgui.accId = 0;
             firstFrame = false;
             recalculateCamera();
         }
 
-        vulkanResources.rayGenData->accId = (uint64_t)accId;
-        accId++;
+        vulkanResources.rayGenData->accId = (uint64_t)vulkanResources.configureImgui.accId;
+        vulkanResources.configureImgui.accId++;
         // Now, trace rays
         gprtBuildShaderBindingTable(vulkanResources.context, GPRT_SBT_RAYGEN);
-        gprtRayGenLaunch2D(vulkanResources.context, vulkanResources.rayGen, fbSize.x, fbSize.y);
+        gprtRayGenLaunch2D(vulkanResources.context, vulkanResources.rayGen, vulkanResources.configureImgui.fbSize.x, vulkanResources.configureImgui.fbSize.y);
 
         // If a window exists, presents the framebuffer here to that window
         // gprtBufferPresent(context, frameBuffer);
@@ -448,7 +442,7 @@ void Viewer::run()
         glBindTexture(GL_TEXTURE_2D, fbTexture);
         GLenum texFormat = GL_RGBA;
         GLenum texelType = GL_UNSIGNED_BYTE;
-        glTexImage2D(GL_TEXTURE_2D, 0, texFormat, fbSize.x, fbSize.y, 0, GL_RGBA,
+        glTexImage2D(GL_TEXTURE_2D, 0, texFormat, vulkanResources.configureImgui.fbSize.x, vulkanResources.configureImgui.fbSize.y, 0, GL_RGBA,
                      texelType, pixels);
         glDisable(GL_LIGHTING);
         glColor3f(1, 1, 1);
@@ -459,33 +453,33 @@ void Viewer::run()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glDisable(GL_DEPTH_TEST);
-        glViewport(0, 0, fbSize.x, fbSize.y);
+        glViewport(0, 0, vulkanResources.configureImgui.fbSize.x, vulkanResources.configureImgui.fbSize.y);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(0.f, (float)fbSize.x, (float)fbSize.y, 0.f, -1.f, 1.f);
+        glOrtho(0.f, (float)vulkanResources.configureImgui.fbSize.x, (float)vulkanResources.configureImgui.fbSize.y, 0.f, -1.f, 1.f);
         glBegin(GL_QUADS);
         {
             glTexCoord2f(0.f, 0.f);
             glVertex3f(0.f, 0.f, 0.f);
             glTexCoord2f(0.f, 1.f);
-            glVertex3f(0.f, (float)fbSize.y, 0.f);
+            glVertex3f(0.f, (float)vulkanResources.configureImgui.fbSize.y, 0.f);
             glTexCoord2f(1.f, 1.f);
-            glVertex3f((float)fbSize.x, (float)fbSize.y, 0.f);
+            glVertex3f((float)vulkanResources.configureImgui.fbSize.x, (float)vulkanResources.configureImgui.fbSize.y, 0.f);
             glTexCoord2f(1.f, 0.f);
-            glVertex3f((float)fbSize.x, 0.f, 0.f);
+            glVertex3f((float)vulkanResources.configureImgui.fbSize.x, 0.f, 0.f);
         }
         glEnd();
 
-        configureImgui.render();
+        vulkanResources.configureImgui.render();
 
         glfwSwapBuffers(handle);
         glfwPollEvents();
 
-        if (configureImgui.updateSelectedObj) {
+        if (vulkanResources.configureImgui.updateSelectedObj) {
             firstFrame = true;
-            accId = 0;
+            vulkanResources.configureImgui.accId = 0;
             vulkanResources.resetVulkanGeometryResources(deviceCode);
-            configureImgui.updateSelectedObj = false;
+            vulkanResources.configureImgui.updateSelectedObj = false;
         }
     }
 }

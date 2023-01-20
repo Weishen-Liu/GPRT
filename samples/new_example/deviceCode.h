@@ -19,12 +19,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef INCLUDE_GPRT
-#define INCLUDE_GPRT
-// public GPRT API
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_DEVICE_CODE
+#define INCLUDE_NEWEXAMPLE_DEVICE_CODE
 #include <gprt.h>
-#endif
 
 /* variables available to all programs */
 
@@ -109,3 +107,4 @@ struct Payload
     ScatterResult scatterResult;
     RandSeed rand;
 };
+#endif

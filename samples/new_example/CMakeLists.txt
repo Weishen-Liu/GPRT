@@ -29,19 +29,16 @@ embed_devicecode(
     ${CMAKE_CURRENT_SOURCE_DIR}/deviceCode.hlsl
 )
 
-# add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/common EXCLUDE_FROM_ALL)
-
-add_executable(new_example hostCode.cpp)
+add_executable(new_example hostCode.cpp common/viewer.cpp common/configureImgui.cpp common/processVulkanResources.cpp)
 target_include_directories(new_example PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_include_directories(new_example PUBLIC ${CMAKE_CURRENT_LIST_DIR}/..)
 target_link_libraries(new_example
-  PUBLIC
+  PRIVATE
     new_example_deviceCode
     gprt::gprt
     glfw
     tiny_obj_loader
     stb_image
     imgui-1
-    # viewer
     ${OPENGL_gl_LIBRARY}
 )

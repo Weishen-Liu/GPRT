@@ -1,19 +1,11 @@
-#ifndef INCLUDE_GPRT
-#define INCLUDE_GPRT
-// public GPRT API
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_COMMON_CAMERA
+#define INCLUDE_NEWEXAMPLE_COMMON_CAMERA
+
 #include <gprt.h>
-#endif
-
-#ifndef INCLUDE_GLFW
-#define INCLUDE_GLFW
-// library for windowing
 #include <GLFW/glfw3.h>
-#endif
 
-#ifndef INCLUDE_ARCBALL
-#define INCLUDE_ARCBALL
 #include "./arcball.hpp"
-#endif
 
 #include "./math/Quaternion.h"
 #include "./math/LinearSpace.h"
@@ -133,3 +125,4 @@ struct Camera
         std::cout<< "Camera Up: " << getUp() << std::endl;
     }
 };
+#endif

@@ -1,14 +1,8 @@
-#ifndef   INCLUDE_GPRT
-#define   INCLUDE_GPRT
-// public GPRT API
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_COMMON_MATERIAL
+#define INCLUDE_NEWEXAMPLE_COMMON_MATERIAL
 #include <gprt.h>
-#endif
-
-#ifndef   INCLUDE_DEVICE_CODE
-#define   INCLUDE_DEVICE_CODE
-// our device-side data structures
 #include "deviceCode.h"
-#endif
 
 struct Lambertian
 {
@@ -25,3 +19,4 @@ struct Dielectric
 {
   float ref_idx;
 };
+#endif
