@@ -28,8 +28,6 @@ void ConfigureImgui::initObj()
 
         LIST_OF_OBJS.push_back(newObj);
     }
-    // Need to at least render one obj
-    LIST_OF_OBJS[0].choosed = true;
 }
 
 void ConfigureImgui::initLight()
