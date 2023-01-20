@@ -1,14 +1,9 @@
-#ifndef   INCLUDE_GPRT
-#define   INCLUDE_GPRT
-// public GPRT API
-#include <gprt.h>
-#endif
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_COMMON_ARCBALL
+#define INCLUDE_NEWEXAMPLE_COMMON_ARCBALL
 
-#ifndef   INCLUDE_GLFW
-#define   INCLUDE_GLFW
-// library for windowing
+#include <gprt.h>
 #include <GLFW/glfw3.h>
-#endif
 
 #include "./math/Quaternion.h"
 
@@ -26,3 +21,5 @@ struct ArcBall
         the dragging mouse button was pressed */
     float3 down_pos = float3(0.f);
 };
+
+#endif

@@ -1,8 +1,7 @@
-#ifndef INCLUDE_GPRT
-#define INCLUDE_GPRT
-// public GPRT API
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_COMMON_LIGHTS
+#define INCLUDE_NEWEXAMPLE_COMMON_LIGHTS
 #include <gprt.h>
-#endif
 
 struct AmbientLight
 {
@@ -18,3 +17,5 @@ struct DirectionalLight
     float3 intensity;
     float3 direction;
 };
+
+#endif

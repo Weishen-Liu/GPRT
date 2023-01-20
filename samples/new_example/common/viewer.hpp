@@ -1,57 +1,30 @@
-#ifndef INCLUDE_GPRT
-#define INCLUDE_GPRT
-// public GPRT API
+#pragma once
+#ifndef INCLUDE_NEWEXAMPLE_COMMON_VIEWER
+#define INCLUDE_NEWEXAMPLE_COMMON_VIEWER
+
 #include <gprt.h>
-#endif
 
-#ifndef INCLUDE_GLFW
-#define INCLUDE_GLFW
-// library for windowing
 #include <GLFW/glfw3.h>
-#endif
 
-#ifndef INCLUDE_IMGUI
-#define INCLUDE_IMGUI
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_opengl2.h>
-#endif
-
-#ifndef INCLUDE_PROCESSVULKANRESOURCES
-#define INCLUDE_PROCESSVULKANRESOURCES
-#include "./processVulkanResources.hpp"
-#endif
-
-#ifndef INCLUDE_ARCBALL
-#define INCLUDE_ARCBALL
-#include "./arcball.hpp"
-#endif
-
-#ifndef INCLUDE_CAMERA
-#define INCLUDE_CAMERA
-#include "./camera.hpp"
-#endif
-
-#ifndef INCLUDE_CONFIGUREIMGUI
-#define INCLUDE_CONFIGUREIMGUI
-#include "./configureImgui.cpp"
-#endif
+#include "arcball.hpp"
+#include "camera.hpp"
+#include "processVulkanResources.hpp"
 
 #include "./math/Quaternion.h"
 #include "./math/LinearSpace.h"
 
-#define Arcball true
-
-#include <iostream>
-
 struct Viewer
 {
-
     ArcBall arcball;
+    // Camera
+    float3 lookFrom = {0.f, 10.f, 10.f};
+    float3 lookAt = {0.f, 0.f, 0.f};
+    float3 lookUp = {0.f, 1.f, 0.f};
+    float cosFovy = 20.f;
     Camera camera;
+
     GLFWwindow *handle{nullptr};
     VulkanResources vulkanResources;
-    ConfigureImgui configureImgui;
     GPRTProgram deviceCode;
 
     struct ButtonState
@@ -63,6 +36,8 @@ struct Viewer
     ButtonState rightButton;
     int2 lastMousePosition{-1, -1};
     int2 lastMousePos = {-1, -1};
+
+    GLuint fbTexture{0};
 
     const float degrees_per_drag_fraction = 150;
     const float pixels_per_move = 10.f;
@@ -108,3 +83,5 @@ struct Viewer
       _moved_ to the given position */
     void mouseMotion(const int2 &newMousePosition);
 };
+
+#endif

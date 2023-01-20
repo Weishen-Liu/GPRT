@@ -40,7 +40,7 @@
 
 #ifndef INCLUDE_VIEWER
 #define INCLUDE_VIEWER
-#include "./common/viewer.cpp"
+#include "./common/viewer.hpp"
 #endif
 
 #include <iostream>

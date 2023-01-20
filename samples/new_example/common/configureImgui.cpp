@@ -1,45 +1,8 @@
-#ifndef INCLUDE_VIEWER_H
-#define INCLUDE_VIEWER_H
-#include "./viewer.hpp"
-#endif
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl2.h>
 
-#ifndef INCLUDE_CONTANTS
-#define INCLUDE_CONTANTS
-#include "./constants.hpp"
-#endif
-
-#include "./math/random.h"
-
-#include <cstring>
-#include <string>
-
-struct ConfigureImgui {
-    bool showImgui = true;
-    bool showLightControlPanel = false;
-    bool showObjControlPanel = false;
-    bool addNewObj = false;
-    bool updateSelectedObj = false;
-    bool objCountWarning = false;
-
-    bool addNewLight = false;
-
-    void render();
-    void renderObjCP();
-    void renderLightCP();
-
-    void initObj();
-    void addObj();
-    void showSelectedObjCountWarning();
-    void updateTransform();
-    void updateMaterial();
-    void updateMaterialDetail();
-
-    void initLight();
-    void addLight();
-    void updateLight();
-
-    void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel);
-};
+#include "./configureImgui.hpp"
 
 void ConfigureImgui::initObj()
 {
