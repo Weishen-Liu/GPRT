@@ -7,7 +7,7 @@
 void ConfigureImgui::initObj()
 {
     std::cout<<"Init Obj"<<std::endl;
-    for (int i = 0; i < ALL_MODEL_PATH.size(); i++)
+    for (int i = 0; i < INITIAL_OBJ.size(); i++)
     {
         owl::common::LCG<4> random;
         random.init(0, 1);
@@ -17,9 +17,9 @@ void ConfigureImgui::initObj()
         float dielectric_ref_idx = random();
 
         Obj newObj;
-        newObj.name = ALL_MODEL_NAME[i];
-        newObj.path = ALL_MODEL_PATH[i];
-        newObj.transform = INITIAL_TRANSFORM[i];
+        newObj.name = INITIAL_OBJ[i]->name;
+        newObj.path = INITIAL_OBJ[i]->path;
+        newObj.transform = float3(0.0f, 0.0f, 0.0f);
         newObj.material.type = ALL_MATERIALS[0].c_str();
         newObj.material.lambertian.albedo = lambertian_color;
         newObj.material.metal.albedo = metal_color;
@@ -27,6 +27,12 @@ void ConfigureImgui::initObj()
         newObj.material.dielectric.ref_idx = dielectric_ref_idx;
 
         LIST_OF_OBJS.push_back(newObj);
+    }
+
+    for (auto each_obj: LIST_OF_OBJS) {
+        if (each_obj.choosed) {
+            SELECTED_OBJS++;
+        }
     }
 }
 
@@ -41,9 +47,20 @@ void ConfigureImgui::initLight()
     DirectionalLight sampleDirectionalLight;
     sampleDirectionalLight.name = "Directional Light Sample #1";
     sampleDirectionalLight.intensity = float3(1.f, 1.f, 1.f);
-    sampleDirectionalLight.direction = float3(0.f, 1.f, 0.f);
-    sampleDirectionalLight.choosed = false;
+    sampleDirectionalLight.direction = float3(0.f, -5.f, 0.f);
+    sampleDirectionalLight.choosed = true;
     LIST_OF_DIRECTIONAL_LIGHTS.push_back(sampleDirectionalLight);
+
+    for (auto each_light: LIST_OF_AMBIENT_LIGHTS) {
+        if (each_light.choosed) {
+            SELECTED_LIGHTS++;
+        }
+    }
+    for (auto each_light: LIST_OF_DIRECTIONAL_LIGHTS) {
+        if (each_light.choosed) {
+            SELECTED_LIGHTS++;
+        }
+    }
 }
 
 void ConfigureImgui::addObj()
@@ -57,7 +74,7 @@ void ConfigureImgui::addObj()
             const char* item = LIST_OF_OBJS[i].name.c_str();
             if (ImGui::Checkbox(item, &LIST_OF_OBJS[i].choosed))
             {
-                updateSelectedObj = true;
+                updateObjSelection = true;
                 if (LIST_OF_OBJS[i].choosed == false) {
                     if (current_item == item)
                     {
@@ -80,7 +97,7 @@ void restrictRange(float min_range, float max_range, float &input)
     if (input < min_range) input = min_range;
 }
 
-void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel)
+void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger)
 {
     float source3[3] = {source.x, source.y, source.z};
     ImGui::Text(title);
@@ -93,7 +110,7 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
         source.x = source3[0];
         source.y = source3[1];
         source.z = source3[2];
-        updateSelectedObj = true;
+        trigger = true;
     }
 
     if (ImGui::SliderFloat3(sliderLabel, source3, min_v, max_v))
@@ -101,13 +118,13 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
         source.x = source3[0];
         source.y = source3[1];
         source.z = source3[2];
-        updateSelectedObj = true;
+        trigger = true;
     }
 }
 
 void ConfigureImgui::updateTransform()
 {
-    inputAndSlider(LIST_OF_OBJS[current_item_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider");
+    inputAndSlider(LIST_OF_OBJS[current_item_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
 }
 
 void ConfigureImgui::updateMaterialDetail()
@@ -115,18 +132,18 @@ void ConfigureImgui::updateMaterialDetail()
 
     if (current_item_material == ALL_MATERIALS[0])
     {
-        inputAndSlider(LIST_OF_OBJS[current_item_index].material.lambertian.albedo, 0.f, 5.f, "Albedo", "Lambertian Albedo Input", "Lambertian Albedo Slider");
+        inputAndSlider(LIST_OF_OBJS[current_item_index].material.lambertian.albedo, 0.f, 1.f, "Albedo", "Lambertian Albedo Input", "Lambertian Albedo Slider", updateObjMaterials);
     }
     else if (current_item_material == ALL_MATERIALS[1])
     {
-        inputAndSlider(LIST_OF_OBJS[current_item_index].material.metal.albedo, 0.f, 5.f, "Albedo", "Metal Albedo Input", "Metal Albedo Slider");
+        inputAndSlider(LIST_OF_OBJS[current_item_index].material.metal.albedo, 0.f, 5.f, "Albedo", "Metal Albedo Input", "Metal Albedo Slider", updateObjMaterials);
 
         float fuzz = LIST_OF_OBJS[current_item_index].material.metal.fuzz;
         ImGui::Text("Fuzz");
         if (ImGui::SliderFloat("Metal Fuzz", &fuzz, 0.0f, 1.0f))
         {
             LIST_OF_OBJS[current_item_index].material.metal.fuzz = fuzz;
-            updateSelectedObj = true;
+            updateObjMaterials = true;
         }
     }
     else if (current_item_material == ALL_MATERIALS[2])
@@ -136,7 +153,7 @@ void ConfigureImgui::updateMaterialDetail()
         if (ImGui::SliderFloat("Dielectric Ref Index", &ref_idx, 0.0f, 1.0f))
         {
             LIST_OF_OBJS[current_item_index].material.dielectric.ref_idx = ref_idx;
-            updateSelectedObj = true;
+            updateObjMaterials = true;
         }
     }
 }
@@ -155,7 +172,7 @@ void ConfigureImgui::updateMaterial()
             {
                 current_item_material = material;
                 LIST_OF_OBJS[current_item_index].material.type = material;
-                updateSelectedObj = true;
+                updateObjMaterials = true;
             }
             if (is_selected)
             {
@@ -214,13 +231,13 @@ void ConfigureImgui::updateLight()
 {
     if (current_light.type == ALL_LIGHTS[0].c_str())
     {
-        inputAndSlider(LIST_OF_AMBIENT_LIGHTS[current_light.index].intensity, 0.f, 5.f, "Intensity", "Ambient Intensity Input", "Ambient Intensity Slider");
+        inputAndSlider(LIST_OF_AMBIENT_LIGHTS[current_light.index].intensity, 0.f, 5.f, "Intensity", "Ambient Intensity Input", "Ambient Intensity Slider", updateLights);
     }
     else if (current_light.type == ALL_LIGHTS[1].c_str())
     {
-        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].intensity, 0.f, 5.f, "Intensity", "Directional Intensity Input", "Directional Intensity Slider");
+        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].intensity, 0.f, 100.f, "Intensity", "Directional Intensity Input", "Directional Intensity Slider", updateLights);
 
-        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].direction, -10.f, 10.f, "Direction", "Directional Direction Input", "Directional Direction Slider");
+        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].direction, -10.f, 10.f, "Direction", "Directional Direction Input", "Directional Direction Slider", updateLights);
     }
 }
 
@@ -235,7 +252,7 @@ void ConfigureImgui::addLight()
             const char* selectedLight = LIST_OF_AMBIENT_LIGHTS[i].name;
             if (ImGui::Checkbox(selectedLight, &LIST_OF_AMBIENT_LIGHTS[i].choosed))
             {
-                updateSelectedObj = true;
+                updateLights = true;
                 if (LIST_OF_AMBIENT_LIGHTS[i].choosed == false) {
                     if (current_light.name == selectedLight)
                     {
@@ -254,7 +271,7 @@ void ConfigureImgui::addLight()
             const char* selectedLight = LIST_OF_DIRECTIONAL_LIGHTS[i].name;
             if (ImGui::Checkbox(selectedLight, &LIST_OF_DIRECTIONAL_LIGHTS[i].choosed))
             {
-                updateSelectedObj = true;
+                updateLights = true;
                 if (LIST_OF_DIRECTIONAL_LIGHTS[i].choosed == false) {
                     if (current_light.name == selectedLight)
                     {

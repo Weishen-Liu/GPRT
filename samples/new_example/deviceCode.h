@@ -43,10 +43,19 @@ struct TrianglesGeomData
     alignas(16) gprt::Buffer color; // vec3f *
 
     alignas(16) gprt::Buffer material_type; // vec3f *
-    alignas(16) gprt::Buffer lambertian; // vec3f *
-    alignas(16) gprt::Buffer metal_albedo;      // vec3f *
-    alignas(16) gprt::Buffer metal_fuzz;      // vec3f *
-    alignas(16) gprt::Buffer dielectric;      // vec3f *
+    alignas(16) gprt::Buffer lambertian;    // vec3f *
+    alignas(16) gprt::Buffer metal_albedo;  // vec3f *
+    alignas(16) gprt::Buffer metal_fuzz;    // vec3f *
+    alignas(16) gprt::Buffer dielectric;    // vec3f *
+
+    struct
+    {
+        alignas(16) int    type;
+        alignas(16) float3 lambertian_albedo;
+        alignas(16) float3 metal_albedo;
+        alignas(16) float  metal_fuzz;
+        alignas(16) float  dielectric_ref_idx;
+    } material;
 };
 
 struct RayGenData
@@ -81,15 +90,6 @@ struct MissProgData
     alignas(16) float3 color1;
 };
 
-struct ScatterResult
-{
-    int scatterEvent;
-    float3 scatteredOrigin;
-    float3 scatteredDirection;
-    float3 attenuation;
-    float3 normal;
-};
-
 struct RandSeed {
     uint state;
     float random_number;
@@ -99,6 +99,17 @@ struct RandSeed {
     float3 rayDescOrg;
     float3 rayDescDir;
     float3 bidir_total_color;
+    float3 total_color_from_light;
+};
+
+struct ScatterResult
+{
+    int scatterEvent;
+    float3 scatteredOrigin;
+    float3 scatteredDirection;
+    float3 attenuation;
+    float3 normal;
+    RandSeed rand;
 };
 
 struct Payload
