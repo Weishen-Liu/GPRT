@@ -28,6 +28,13 @@ struct Obj {
     Material material;
 };
 
+struct LoadInObj {
+    std::string name;
+    std::string path;
+
+    LoadInObj(std::string inputName, std::string inputPath) : name(inputName), path(inputPath) {}
+};
+
 struct ConfigureImgui {
     const char* current_item = NULL;
     const char* current_item_material = NULL;
@@ -40,34 +47,16 @@ struct ConfigureImgui {
         int index = -1;
     }current_light;
 
-    const std::vector<std::string> ALL_MODEL_NAME = {
-        "Viking Room",
-        "Cube",
-        "Mario",
-        "Bunny",
-        "Sphere",
-        "Sponza",
-        "Horse"
-    };
-
-    const std::vector<std::string> ALL_MODEL_PATH = {
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj",
-        "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"
-    };
-
-    std::vector<float3> INITIAL_TRANSFORM = {
-        float3(0.0f, 0.0f, 0.0f),
-        float3(0.0f, 0.0f, 1.1f),
-        float3(0.344626f, 12.9949f, -0.114619f),
-        float3(2 * sin(2 * M_PI * .33), 2 * cos(2 * M_PI * .33), 1.5f),
-        float3(2 * sin(2 * M_PI * .66), 2 * cos(2 * M_PI * .66), 1.5f),
-        float3(2 * sin(2 * M_PI * 1.0), 2 * cos(2 * M_PI * 1.0), 1.5f),
-        float3(0.0f, 0.0f, -4.0f)
+    std::vector<LoadInObj*> INITIAL_OBJ = {
+        new LoadInObj("Viking Room", "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj"),
+        new LoadInObj("Cube",        "/media/storage0/weishen/GPRT-1/samples/new_example/models/Cube.obj"),
+        new LoadInObj("Mario",       "/media/storage0/weishen/GPRT-1/samples/new_example/models/Mario.obj"),
+        new LoadInObj("Bunny",       "/media/storage0/weishen/GPRT-1/samples/new_example/models/bunny.obj"),
+        new LoadInObj("Sphere",      "/media/storage0/weishen/GPRT-1/samples/new_example/models/sphere.obj"),
+        new LoadInObj("Sponza",      "/media/storage0/weishen/GPRT-1/samples/new_example/models/sponza.obj"),
+        new LoadInObj("Horse",       "/media/storage0/weishen/GPRT-1/samples/new_example/models/horse.obj"),
+        new LoadInObj("New Cube",    "/media/storage0/weishen/GPRT-1/samples/new_example/models/newCube.obj"),
+        new LoadInObj("Cottage",     "/media/storage0/weishen/GPRT-1/samples/new_example/models/cottage.obj"),
     };
 
     std::vector<Obj> LIST_OF_OBJS;
@@ -96,9 +85,12 @@ struct ConfigureImgui {
     bool showLightControlPanel = false;
     bool showObjControlPanel = false;
     bool addNewObj = false;
-    bool updateSelectedObj = false;
-    bool objCountWarning = false;
     bool addNewLight = false;
+
+    bool updateObjSelection = false;
+    bool updateObjTransform = false;
+    bool updateObjMaterials = false;    
+    bool updateLights = false;
 
     void render();
     void renderObjCP();
@@ -115,7 +107,7 @@ struct ConfigureImgui {
     void addLight();
     void updateLight();
 
-    void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel);
+    void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger);
 };
 
 #endif

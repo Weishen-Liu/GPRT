@@ -326,7 +326,7 @@ void Viewer::init(GPRTProgram new_example_deviceCode)
     vulkanResources.configureImgui.initObj();
     vulkanResources.configureImgui.initLight();
     deviceCode = new_example_deviceCode;
-    vulkanResources.initialVulkanResources(new_example_deviceCode);
+    vulkanResources.initialVulkanResources(deviceCode);
 }
 
 void Viewer::initWindow()
@@ -475,11 +475,31 @@ void Viewer::run()
         glfwSwapBuffers(handle);
         glfwPollEvents();
 
-        if (vulkanResources.configureImgui.updateSelectedObj) {
+        // Add Obj
+        if (vulkanResources.configureImgui.updateObjSelection) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshObj();
+            vulkanResources.configureImgui.updateObjSelection = false;
+        } else if (vulkanResources.configureImgui.updateObjTransform) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshObj();
+            vulkanResources.configureImgui.updateObjTransform = false;
+        } else if (vulkanResources.configureImgui.updateObjMaterials) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshObjMaterial();
+            vulkanResources.configureImgui.updateObjMaterials = false;
+        } else if (vulkanResources.configureImgui.updateLights) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            // vulkanResources.refreshLights();
             vulkanResources.resetVulkanGeometryResources(deviceCode);
-            vulkanResources.configureImgui.updateSelectedObj = false;
+            vulkanResources.configureImgui.updateLights = false;
         }
+        // else {
+        //     std::cout<<"No Changes"<<std::endl;
+        // }
     }
 }

@@ -64,80 +64,148 @@ void VulkanResources::createGeometry(int each_path) {
     // ------------------------------------------------------------------
     // triangle mesh
     // ------------------------------------------------------------------
-    if (listOfGeometry.size() > each_path && configureImgui.LIST_OF_OBJS[each_path].choosed == false)
-    {
-        gprtTrianglesSetIndices(listOfGeometry[each_path].trianglesGeom, listOfGeometry[each_path].indexBuffer, 0);
-        return;
-    }
-
-    Geometry newGeometry;
-    newGeometry.trianglesGeom = gprtGeomCreate<TrianglesGeomData>(context, trianglesGeomType);
+    Geometry geometry;
+    geometry.trianglesGeom = gprtGeomCreate<TrianglesGeomData>(context, trianglesGeomType);
 
     loadModel(
         configureImgui.LIST_OF_OBJS[each_path],
-        newGeometry.list_of_vertices,
-        newGeometry.list_of_indices,
-        newGeometry.list_of_colors,
-        newGeometry.list_of_vertex_normals,
-        newGeometry.list_of_material_type,
-        newGeometry.list_of_lambertians,
-        newGeometry.list_of_metals_albedo,
-        newGeometry.list_of_metals_fuzz,
-        newGeometry.list_of_dielectrics
+        geometry.list_of_vertices,
+        geometry.list_of_indices,
+        geometry.list_of_colors,
+        geometry.list_of_vertex_normals
     );
-    
-    newGeometry.vertexBuffer = gprtDeviceBufferCreate<float3>(
-        context, newGeometry.list_of_vertices.size(), static_cast<const void *>(newGeometry.list_of_vertices.data()));
-    newGeometry.indexBuffer = gprtDeviceBufferCreate<int3>(
-        context, newGeometry.list_of_indices.size(), static_cast<const void *>(newGeometry.list_of_indices.data()));
-    newGeometry.normalBuffer = gprtDeviceBufferCreate<float3>(
-        context, newGeometry.list_of_vertex_normals.size(), static_cast<const void *>(newGeometry.list_of_vertex_normals.data()));
-    newGeometry.colorBuffer = gprtDeviceBufferCreate<float3>(
-        context, newGeometry.list_of_colors.size(), static_cast<const void *>(newGeometry.list_of_colors.data()));
-    newGeometry.materialTypeBuffer = gprtDeviceBufferCreate<int>(
-        context, newGeometry.list_of_material_type.size(), static_cast<const void *>(newGeometry.list_of_material_type.data()));
-    newGeometry.lambertianBuffer = gprtDeviceBufferCreate<float3>(
-        context, newGeometry.list_of_lambertians.size(), static_cast<const void *>(newGeometry.list_of_lambertians.data()));
-    newGeometry.metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(
-        context, newGeometry.list_of_metals_albedo.size(), static_cast<const void *>(newGeometry.list_of_metals_albedo.data()));
-    newGeometry.metalFuzzBuffer = gprtDeviceBufferCreate<float>(
-        context, newGeometry.list_of_metals_fuzz.size(), static_cast<const void *>(newGeometry.list_of_metals_fuzz.data()));
-    newGeometry.dielectricBuffer = gprtDeviceBufferCreate<float>(
-        context, newGeometry.list_of_dielectrics.size(), static_cast<const void *>(newGeometry.list_of_dielectrics.data()));
+    geometry.vertexBuffer = gprtDeviceBufferCreate<float3>(
+        context, geometry.list_of_vertices.size(), static_cast<const void *>(geometry.list_of_vertices.data()));
+    geometry.indexBuffer = gprtDeviceBufferCreate<int3>(
+        context, geometry.list_of_indices.size(), static_cast<const void *>(geometry.list_of_indices.data()));
+    geometry.normalBuffer = gprtDeviceBufferCreate<float3>(
+        context, geometry.list_of_vertex_normals.size(), static_cast<const void *>(geometry.list_of_vertex_normals.data()));
+    geometry.colorBuffer = gprtDeviceBufferCreate<float3>(
+        context, geometry.list_of_colors.size(), static_cast<const void *>(geometry.list_of_colors.data()));
 
-    geomData = gprtGeomGetPointer(newGeometry.trianglesGeom);
-    geomData->vertex = gprtBufferGetHandle(newGeometry.vertexBuffer);
-    geomData->index = gprtBufferGetHandle(newGeometry.indexBuffer);
-    geomData->normal = gprtBufferGetHandle(newGeometry.normalBuffer);
-    geomData->color = gprtBufferGetHandle(newGeometry.colorBuffer);
-    geomData->material_type = gprtBufferGetHandle(newGeometry.materialTypeBuffer);
-    geomData->metal_albedo = gprtBufferGetHandle(newGeometry.metalAlbedoBuffer);
-    geomData->metal_fuzz = gprtBufferGetHandle(newGeometry.metalFuzzBuffer);
-    geomData->lambertian = gprtBufferGetHandle(newGeometry.lambertianBuffer);
-    geomData->dielectric = gprtBufferGetHandle(newGeometry.dielectricBuffer);
+    geometry.geomData = gprtGeomGetPointer(geometry.trianglesGeom);
+    geometry.geomData->vertex = gprtBufferGetHandle(geometry.vertexBuffer);
+    geometry.geomData->index = gprtBufferGetHandle(geometry.indexBuffer);
+    geometry.geomData->normal = gprtBufferGetHandle(geometry.normalBuffer);
+    geometry.geomData->color = gprtBufferGetHandle(geometry.colorBuffer);
 
-    gprtTrianglesSetVertices(newGeometry.trianglesGeom, newGeometry.vertexBuffer, newGeometry.list_of_vertices.size());
-    gprtTrianglesSetIndices(newGeometry.trianglesGeom, newGeometry.indexBuffer, newGeometry.list_of_indices.size() * configureImgui.LIST_OF_OBJS[each_path].choosed);
+    gprtTrianglesSetVertices(geometry.trianglesGeom, geometry.vertexBuffer, geometry.list_of_vertices.size());
+    gprtTrianglesSetIndices(geometry.trianglesGeom, geometry.indexBuffer, geometry.list_of_indices.size());
 
-    if (listOfGeometry.size() <= each_path)
-    {
-        listOfGeometry.push_back(newGeometry);
-        listOfTrianglesGeom.push_back(newGeometry.trianglesGeom);
-    }
-    else
-    {
-        listOfGeometry[each_path] = newGeometry;
-        listOfTrianglesGeom[each_path] = newGeometry.trianglesGeom;
-    }
+    geometry.trianglesBLAS = gprtTrianglesAccelCreate(context, 1, &geometry.trianglesGeom);
+    gprtAccelBuild(context, geometry.trianglesBLAS);
+    listOfGeometry.push_back(geometry);
 }
 
-void VulkanResources::resetVulkanGeometryResources(GPRTProgram new_example_deviceCode)
+void VulkanResources::updateGeometryMaterial(Geometry &geometry, Obj &obj)
+{
+    loadMaterials(
+        obj,
+        geometry.obj_material_type,
+        geometry.lambertian_albedo,
+        geometry.metal_albedo,
+        geometry.metal_fuzz,
+        geometry.dielectric_ref_idx
+    );
+
+    geometry.materialTypeBuffer = gprtDeviceBufferCreate<int>(
+        context, 1, static_cast<const void *>(&geometry.obj_material_type));
+    geometry.lambertianBuffer = gprtDeviceBufferCreate<float3>(
+        context, 1, static_cast<const void *>(&geometry.lambertian_albedo));
+    geometry.metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(
+        context, 1, static_cast<const void *>(&geometry.metal_albedo));
+    geometry.metalFuzzBuffer = gprtDeviceBufferCreate<float>(
+        context, 1, static_cast<const void *>(&geometry.metal_fuzz));
+    geometry.dielectricBuffer = gprtDeviceBufferCreate<float>(
+        context, 1, static_cast<const void *>(&geometry.dielectric_ref_idx));
+
+    geometry.geomData->material.type               = (uint64_t)geometry.obj_material_type;
+    geometry.geomData->material.metal_albedo       = geometry.metal_albedo;
+    geometry.geomData->material.metal_fuzz         = geometry.metal_fuzz;
+    geometry.geomData->material.lambertian_albedo  = geometry.lambertian_albedo;
+    geometry.geomData->material.dielectric_ref_idx = geometry.dielectric_ref_idx;
+
+    // loadMaterials(
+    //     obj,
+    //     geometry.list_of_indices.size(),
+    //     geometry.list_of_material_type,
+    //     geometry.list_of_lambertians,
+    //     geometry.list_of_metals_albedo,
+    //     geometry.list_of_metals_fuzz,
+    //     geometry.list_of_dielectrics
+    // );
+
+    // geometry.materialTypeBuffer = gprtDeviceBufferCreate<int>(
+    //     context, geometry.list_of_material_type.size(), static_cast<const void *>(geometry.list_of_material_type.data()));
+    // geometry.lambertianBuffer = gprtDeviceBufferCreate<float3>(
+    //     context, geometry.list_of_lambertians.size(), static_cast<const void *>(geometry.list_of_lambertians.data()));
+    // geometry.metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(
+    //     context, geometry.list_of_metals_albedo.size(), static_cast<const void *>(geometry.list_of_metals_albedo.data()));
+    // geometry.metalFuzzBuffer = gprtDeviceBufferCreate<float>(
+    //     context, geometry.list_of_metals_fuzz.size(), static_cast<const void *>(geometry.list_of_metals_fuzz.data()));
+    // geometry.dielectricBuffer = gprtDeviceBufferCreate<float>(
+    //     context, geometry.list_of_dielectrics.size(), static_cast<const void *>(geometry.list_of_dielectrics.data()));
+
+    geometry.geomData->material_type = gprtBufferGetHandle(geometry.materialTypeBuffer);
+    geometry.geomData->metal_albedo  = gprtBufferGetHandle(geometry.metalAlbedoBuffer);
+    geometry.geomData->metal_fuzz    = gprtBufferGetHandle(geometry.metalFuzzBuffer);
+    geometry.geomData->lambertian    = gprtBufferGetHandle(geometry.lambertianBuffer);
+    geometry.geomData->dielectric    = gprtBufferGetHandle(geometry.dielectricBuffer);
+}
+
+void VulkanResources::resetVulkanGeometryResources(GPRTProgram deviceCode)
 {
     list_of_ambient_lights_intensity = {};
     list_of_directional_lights_intensity = {};
     list_of_directional_lights_direction = {};
 
-    updateVulkanResources();
+    listOfGeometry = {};
+    listOfTrianglesBLAS = {};
+    transforms = {};
+    initialVulkanResources(deviceCode);
+}
+
+void VulkanResources::buildSBT()
+{
+    // ##################################################################
+    // build *SBT* required to trace the groups
+    // ##################################################################
+    gprtBuildPipeline(context);
+    gprtBuildShaderBindingTable(context, GPRT_SBT_ALL);
+}
+
+void VulkanResources::refreshObj()
+{
+    listOfTrianglesBLAS = {};
+    transforms = {};
+
+    std::cout<<"Accel"<<std::endl;
+    createAccel();
+
+    rayGenData->world = gprtAccelGetHandle(trianglesTLAS);
+    rayGenData->accId = (uint64_t)configureImgui.accId;
+    buildSBT();
+}
+
+void VulkanResources::refreshObjMaterial()
+{
+    for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
+    {
+        updateGeometryMaterial(listOfGeometry[each_path], configureImgui.LIST_OF_OBJS[each_path]);
+    }
+
+    refreshObj();
+}
+
+void VulkanResources::refreshLights()
+{
+    list_of_ambient_lights_intensity = {};
+    list_of_directional_lights_intensity = {};
+    list_of_directional_lights_direction = {};
+
+    createRayGen();
+    
+    buildSBT();
 }
 
 void VulkanResources::updateVulkanResources() {
@@ -148,7 +216,19 @@ void VulkanResources::updateVulkanResources() {
     for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
     {
         createGeometry(each_path);
-    } 
+    }
+
+    // Create Trash Geometry for 0 TLAS Buffer
+    trashGeometry = listOfGeometry[0];
+    gprtTrianglesSetIndices(trashGeometry.trianglesGeom, trashGeometry.indexBuffer, 0);
+    trashGeometry.trianglesBLAS = gprtTrianglesAccelCreate(context, 1, &trashGeometry.trianglesGeom);
+    gprtAccelBuild(context, trashGeometry.trianglesBLAS);
+
+    for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
+    {
+        updateGeometryMaterial(listOfGeometry[each_path], configureImgui.LIST_OF_OBJS[each_path]);
+    }
+
     // ------------------------------------------------------------------
     // the group/accel for that mesh
     // ------------------------------------------------------------------
@@ -164,11 +244,7 @@ void VulkanResources::updateVulkanResources() {
     std::cout<<"RayGen"<<std::endl;
     createRayGen();
     
-    // ##################################################################
-    // build *SBT* required to trace the groups
-    // ##################################################################
-    gprtBuildPipeline(context);
-    gprtBuildShaderBindingTable(context, GPRT_SBT_ALL);
+    buildSBT();
 }
 
 void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode) {
@@ -188,9 +264,24 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
 }
 
 void VulkanResources::createAccel() {
-    trianglesBLAS = gprtTrianglesAccelCreate(context, listOfTrianglesGeom.size(), listOfTrianglesGeom.data());
-    trianglesTLAS = gprtInstanceAccelCreate(context, 1, &trianglesBLAS);
-    gprtAccelBuild(context, trianglesBLAS);
+    for (int i = 0; i < configureImgui.LIST_OF_OBJS.size(); i++)
+    {
+        if (configureImgui.LIST_OF_OBJS[i].choosed)
+        {
+            listOfTrianglesBLAS.push_back(listOfGeometry[i].trianglesBLAS);
+            transforms.push_back(transpose(translation_matrix(configureImgui.LIST_OF_OBJS[i].transform)));
+        }
+    }
+
+    if (transforms.size() > 0) {
+        trianglesTLAS = gprtInstanceAccelCreate(context, listOfTrianglesBLAS.size(), listOfTrianglesBLAS.data());
+
+        transformBuffer = gprtDeviceBufferCreate<float4x4>(context, transforms.size(), transforms.data());
+        gprtInstanceAccelSet4x4Transforms(trianglesTLAS, transformBuffer);
+    } else {
+        trianglesTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometry.trianglesBLAS);
+    }
+
     gprtAccelBuild(context, trianglesTLAS);
 }
 
@@ -201,7 +292,7 @@ void VulkanResources::createMiss() {
     missData->color1 = float3(0.0f, 0.0f, 0.0f);
 }
 
-void VulkanResources::createRayGen() {
+void VulkanResources::updateLights() {
     rayGenData = gprtRayGenGetPointer(rayGen);
     // ----------- create lights  ----------------------------
     loadLights(
@@ -225,39 +316,58 @@ void VulkanResources::createRayGen() {
         rayGenData->directional_lights_intensity = gprtBufferGetHandle(directionalLightIntensityBuffer);
         rayGenData->directional_lights_dir = gprtBufferGetHandle(directionalLightDirBuffer);
     }
+    rayGenData->ambient_light_size = (uint64_t)list_of_ambient_lights_intensity.size();
+    rayGenData->directional_light_size = (uint64_t)list_of_directional_lights_intensity.size();
+}
+
+void VulkanResources::createRayGen() {
+    updateLights();
 
     // ----------- set variables  ----------------------------
     rayGenData->world = gprtAccelGetHandle(trianglesTLAS);
     rayGenData->frameBuffer = gprtBufferGetHandle(frameBuffer);
     rayGenData->accBuffer = gprtBufferGetHandle(accBuffer);
     rayGenData->accId = (uint64_t)configureImgui.accId;
-    rayGenData->ambient_light_size = (uint64_t)list_of_ambient_lights_intensity.size();
-    rayGenData->directional_light_size = (uint64_t)list_of_directional_lights_intensity.size();
 }
 
 void VulkanResources::destoryVulkanResources() {
-    gprtBufferDestroy(ambientLightIntensityBuffer);
-    gprtBufferDestroy(directionalLightIntensityBuffer);
-    gprtBufferDestroy(directionalLightDirBuffer);
+    if (list_of_ambient_lights_intensity.size())
+    {
+        gprtBufferDestroy(ambientLightIntensityBuffer);
+    }
+
+    if (list_of_directional_lights_intensity.size())
+    {
+        gprtBufferDestroy(directionalLightIntensityBuffer);
+        gprtBufferDestroy(directionalLightDirBuffer);
+    }
+    
     for (auto eachGeo: listOfGeometry)
     {
         gprtBufferDestroy(eachGeo.vertexBuffer);
         gprtBufferDestroy(eachGeo.normalBuffer);
         gprtBufferDestroy(eachGeo.indexBuffer);
+        gprtBufferDestroy(eachGeo.colorBuffer);
         gprtBufferDestroy(eachGeo.materialTypeBuffer);
         gprtBufferDestroy(eachGeo.metalAlbedoBuffer);
         gprtBufferDestroy(eachGeo.metalFuzzBuffer);
         gprtBufferDestroy(eachGeo.lambertianBuffer);
         gprtBufferDestroy(eachGeo.dielectricBuffer);
-        gprtBufferDestroy(eachGeo.colorBuffer);
         gprtGeomDestroy(eachGeo.trianglesGeom);
     }
-    
     gprtBufferDestroy(frameBuffer);
     gprtBufferDestroy(accBuffer);
+
+    if (transforms.size() > 0)
+    {
+        gprtBufferDestroy(transformBuffer);
+    }
+
     gprtRayGenDestroy(rayGen);
     gprtMissDestroy(miss);
-    gprtAccelDestroy(trianglesBLAS);
+    for (auto eachBLAS: listOfTrianglesBLAS){
+        gprtAccelDestroy(eachBLAS);
+    }
     gprtAccelDestroy(trianglesTLAS);
     gprtGeomTypeDestroy(trianglesGeomType);
     gprtModuleDestroy(module);
@@ -269,17 +379,9 @@ void VulkanResources::loadModel(
     std::vector<float3>& list_of_vertices,
     std::vector<int3>& list_of_indices,
     std::vector<float3>& list_of_colors,
-    std::vector<float3>&list_of_vertex_normals,
-    std::vector<int>&list_of_material_type,
-    std::vector<float3>&list_of_lambertians,
-    std::vector<float3>&list_of_metals_albedo,
-    std::vector<float>&list_of_metals_fuzz,
-    std::vector<float>&list_of_dielectrics
+    std::vector<float3>&list_of_vertex_normals
 ){
     std::string obj_path = obj.path;
-    Material obj_material = obj.material;
-    std::string material_type = obj_material.type;
-    float4x4 transform = translation_matrix(obj.transform);
 
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -311,6 +413,7 @@ void VulkanResources::loadModel(
             } else {
                 vertex.normal = float3(0.f, 0.f, 0.f);
             }
+            vertex.normal = float3(0.f, 0.f, 0.f);
 
             // vertex.texCoord = {
             //     attrib.texcoords[2 * index.texcoord_index + 0],
@@ -321,10 +424,7 @@ void VulkanResources::loadModel(
 
             if (uniqueVertices.count(vertex) == 0) {
                 uniqueVertices[vertex] = static_cast<uint32_t>(list_of_vertices.size());
-                float4 p = mul(
-                    transform, float4(vertex.pos[0], vertex.pos[1], vertex.pos[2], 1.0)
-                );
-                list_of_vertices.push_back(p.xyz());
+                list_of_vertices.push_back(vertex.pos);
                 list_of_colors.push_back(vertex.color);
                 list_of_vertex_normals.push_back(vertex.normal);
             }
@@ -336,12 +436,53 @@ void VulkanResources::loadModel(
     for (int i = 0; i < indices.size(); i+=3) {
         int3 each_indices = {indices[i], indices[i+1], indices[i+2]};
         list_of_indices.push_back(each_indices);
+    }
+}
+
+void VulkanResources::loadMaterials(
+    Obj& obj,
+    int& obj_material_type,
+    float3& lambertians_albedo,
+    float3& metals_albedo,
+    float& metals_fuzz,
+    float& dielectrics_ref_idx
+)
+{
+    Material obj_material = obj.material;
+    std::string material_type = obj_material.type;
+
+    lambertians_albedo = obj_material.lambertian.albedo;
+    metals_albedo = obj_material.metal.albedo;
+    metals_fuzz = obj_material.metal.fuzz;
+    dielectrics_ref_idx = obj_material.dielectric.ref_idx;
+
+    for (int each_material = 0; each_material < configureImgui.ALL_MATERIALS.size(); each_material++)
+    {
+        if (material_type == configureImgui.ALL_MATERIALS[each_material])
+        {
+            obj_material_type = each_material;
+            break;
+        }
+    }
+}
+
+void VulkanResources::loadMaterials(
+    Obj& obj,
+    int list_of_indices_size,
+    std::vector<int>&list_of_material_type,
+    std::vector<float3>&list_of_lambertians,
+    std::vector<float3>&list_of_metals_albedo,
+    std::vector<float>&list_of_metals_fuzz,
+    std::vector<float>&list_of_dielectrics
+)
+{
+    Material obj_material = obj.material;
+    std::string material_type = obj_material.type;
+    for (int i = 0; i < list_of_indices_size; i++) {
 
         list_of_lambertians.push_back(obj_material.lambertian.albedo);
-
         list_of_metals_albedo.push_back(obj_material.metal.albedo);
         list_of_metals_fuzz.push_back(obj_material.metal.fuzz);
-
         list_of_dielectrics.push_back(obj_material.dielectric.ref_idx);
 
         for (int each_material = 0; each_material < configureImgui.ALL_MATERIALS.size(); each_material++)
