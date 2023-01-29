@@ -25,8 +25,10 @@
 /* variables available to all programs */
 
 /* variables for the triangle mesh geometry */
-struct AABBGeomData {
-  alignas(8) int tmp;   // unused for now
+struct TrianglesGeomData {
+  alignas(16) gprt::Buffer indices;
+  alignas(16) gprt::Buffer vertices;
+  alignas(16) float4 color;
 };
 
 struct RayGenData {
@@ -40,6 +42,9 @@ struct RayGenData {
     alignas(16) float3 dir_du;
     alignas(16) float3 dir_dv;
   } camera;
+
+  alignas(16) float3 lightColor;
+  alignas(16) float3 lightPos;
 };
 
 /* variables for the miss program */

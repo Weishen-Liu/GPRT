@@ -53,6 +53,8 @@ function(embed_devicecode)
     "MISS"
     "CALLABLE"
     "COMPUTE"
+    "VERTEX"
+    "PIXEL"
   )
   list(LENGTH ENTRY_POINT_TYPES NUM_ENTRY_POINT_TYPES)
   math(EXPR NUM_ENTRY_POINT_TYPES_MINUS_ONE "${NUM_ENTRY_POINT_TYPES}-1")
@@ -61,11 +63,13 @@ function(embed_devicecode)
 
     list(GET ENTRY_POINT_TYPES ${idx} ENTRY_POINT_TYPE)
 
+    
     # Compile hlsl to SPIRV
     add_custom_command(
       OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${EMBED_DEVICECODE_OUTPUT_TARGET}_${ENTRY_POINT_TYPE}.spv
       COMMAND ${CMAKE_DXC_COMPILER}
       -HV 2021
+      -enable-16bit-types
       -spirv
       -fspv-target-env=vulkan1.1spirv1.4
       -HV 2021
@@ -78,6 +82,7 @@ function(embed_devicecode)
       -fspv-extension=SPV_KHR_non_semantic_info
       -fspv-extension=SPV_KHR_physical_storage_buffer
       -fspv-extension=SPV_KHR_vulkan_memory_model
+      -fspv-extension=SPV_EXT_descriptor_indexing
       -fcgl
       ${EMBED_DEVICECODE_SOURCES}
       -Fo ${CMAKE_CURRENT_BINARY_DIR}/${EMBED_DEVICECODE_OUTPUT_TARGET}_${ENTRY_POINT_TYPE}.spv
