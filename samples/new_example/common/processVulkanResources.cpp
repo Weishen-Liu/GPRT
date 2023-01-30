@@ -266,10 +266,13 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
 void VulkanResources::createAccel() {
     for (int i = 0; i < configureImgui.LIST_OF_OBJS.size(); i++)
     {
-        if (configureImgui.LIST_OF_OBJS[i].choosed)
+        for (auto eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
         {
-            listOfTrianglesBLAS.push_back(listOfGeometry[i].trianglesBLAS);
-            transforms.push_back(transpose(translation_matrix(configureImgui.LIST_OF_OBJS[i].transform)));
+            if (eachInstance.choosed)
+            {
+                listOfTrianglesBLAS.push_back(listOfGeometry[i].trianglesBLAS);
+                transforms.push_back(transpose(translation_matrix(eachInstance.transform)));
+            }
         }
     }
 

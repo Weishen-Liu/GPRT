@@ -19,7 +19,11 @@ void ConfigureImgui::initObj()
         Obj newObj;
         newObj.name = INITIAL_OBJ[i]->name;
         newObj.path = INITIAL_OBJ[i]->path;
-        newObj.transform = float3(0.0f, 0.0f, 0.0f);
+        Obj::Instance instance;
+        instance.transform = float3(0.0f, 0.0f, 0.0f);
+        instance.name = newObj.name + std::to_string(newObj.instances.size());
+        newObj.instances.push_back(instance);
+        // newObj.transform = float3(0.0f, 0.0f, 0.0f);
         newObj.material.type = ALL_MATERIALS[0].c_str();
         newObj.material.lambertian.albedo = lambertian_color;
         newObj.material.metal.albedo = metal_color;
@@ -30,8 +34,10 @@ void ConfigureImgui::initObj()
     }
 
     for (auto each_obj: LIST_OF_OBJS) {
-        if (each_obj.choosed) {
-            SELECTED_OBJS++;
+        for (auto each_instance: each_obj.instances) {
+            if (each_instance.choosed) {
+                each_obj.SELECTED_OBJ_INSTANCE++;
+            }
         }
     }
 }
@@ -63,31 +69,80 @@ void ConfigureImgui::initLight()
     }
 }
 
-void ConfigureImgui::addObj()
+void ConfigureImgui::addObjInstance(Obj& obj)
 {
-    if (addNewObj)
+    if (obj.addObjInstanceWindow)
     {
-        ImGui::Begin("Add Obj", &addNewObj);
-        ImGui::Text("Selected %d Objs", SELECTED_OBJS);
-        for (int i = 0; i < LIST_OF_OBJS.size(); i++)
+        const char* item = obj.name.c_str();
+        ImGui::Begin("Add Instance", &obj.addObjInstanceWindow);
+        ImGui::Text("Selected %d Instances under Obj '%s'", obj.SELECTED_OBJ_INSTANCE, item);
+        for (int eachInstance = 0; eachInstance < obj.instances.size(); eachInstance++)
         {
-            const char* item = LIST_OF_OBJS[i].name.c_str();
-            if (ImGui::Checkbox(item, &LIST_OF_OBJS[i].choosed))
+            const char* instance_name = obj.instances[eachInstance].name.c_str();
+            if (ImGui::Checkbox(instance_name, &obj.instances[eachInstance].choosed))
             {
                 updateObjSelection = true;
-                if (LIST_OF_OBJS[i].choosed == false) {
-                    if (current_item == item)
+                if (obj.instances[eachInstance].choosed == false) {
+                    if (obj.current_instance == instance_name)
                     {
-                        current_item = NULL;
-                        current_item_index = -1;
+                        obj.current_instance = NULL;
+                        obj.current_instance_index = -1;
                     }
-                    SELECTED_OBJS -= 1;
+                    obj.SELECTED_OBJ_INSTANCE -= 1;
                 } else {
-                    SELECTED_OBJS += 1;
+                    obj.SELECTED_OBJ_INSTANCE += 1;
                 }
             }
         }
         ImGui::End();
+    }
+}
+
+void ConfigureImgui::objInstances()
+{
+    for (int eachObj = 0; eachObj < LIST_OF_OBJS.size(); eachObj++)
+    {
+        const char* item = LIST_OF_OBJS[eachObj].name.c_str();
+        if (LIST_OF_OBJS[eachObj].openInstanceWindow)
+        {
+            ImGui::Begin(item, &LIST_OF_OBJS[eachObj].openInstanceWindow);
+            // Add Instance Window
+            if (ImGui::Button("Add Instance"))
+            {
+                LIST_OF_OBJS[eachObj].addObjInstanceWindow = !LIST_OF_OBJS[eachObj].addObjInstanceWindow;
+            }
+            addObjInstance(LIST_OF_OBJS[eachObj]);
+
+            // Configure Instance Transform
+            ImGui::Text("Loaded "); ImGui::SameLine();
+            if (ImGui::BeginCombo(" Instance", LIST_OF_OBJS[eachObj].current_instance)) // The second parameter is the label previewed before opening the combo.
+            {
+                for (int n = 0; n < LIST_OF_OBJS[eachObj].instances.size(); n++)
+                {
+                    const char* isntance_name = LIST_OF_OBJS[eachObj].instances[n].name.c_str();
+                    bool is_selected = (LIST_OF_OBJS[eachObj].current_instance == isntance_name); // You can store your selection however you want, outside or inside your objects
+                    if (LIST_OF_OBJS[eachObj].instances[n].choosed == false)
+                    {
+                        continue;
+                    }
+                    if (ImGui::Selectable(isntance_name, is_selected))
+                    {
+                        LIST_OF_OBJS[eachObj].current_instance = isntance_name;
+                        LIST_OF_OBJS[eachObj].current_instance_index = n;
+                    }
+                    if (is_selected)
+                    {
+                        ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (LIST_OF_OBJS[eachObj].current_instance != NULL) {
+                updateTransform(LIST_OF_OBJS[eachObj]);
+                updateMaterial(LIST_OF_OBJS[eachObj]);
+            }
+            ImGui::End();
+        }
     }
 }
 
@@ -122,56 +177,56 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
     }
 }
 
-void ConfigureImgui::updateTransform()
+void ConfigureImgui::updateTransform(Obj& obj)
 {
-    inputAndSlider(LIST_OF_OBJS[current_item_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
+    inputAndSlider(obj.instances[obj.current_instance_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
 }
 
-void ConfigureImgui::updateMaterialDetail()
+void ConfigureImgui::updateMaterialDetail(Obj& obj)
 {
 
-    if (current_item_material == ALL_MATERIALS[0])
+    if (obj.current_instance_material == ALL_MATERIALS[0])
     {
-        inputAndSlider(LIST_OF_OBJS[current_item_index].material.lambertian.albedo, 0.f, 1.f, "Albedo", "Lambertian Albedo Input", "Lambertian Albedo Slider", updateObjMaterials);
+        inputAndSlider(obj.material.lambertian.albedo, 0.f, 1.f, "Albedo", "Lambertian Albedo Input", "Lambertian Albedo Slider", updateObjMaterials);
     }
-    else if (current_item_material == ALL_MATERIALS[1])
+    else if (obj.current_instance_material == ALL_MATERIALS[1])
     {
-        inputAndSlider(LIST_OF_OBJS[current_item_index].material.metal.albedo, 0.f, 5.f, "Albedo", "Metal Albedo Input", "Metal Albedo Slider", updateObjMaterials);
+        inputAndSlider(obj.material.metal.albedo, 0.f, 5.f, "Albedo", "Metal Albedo Input", "Metal Albedo Slider", updateObjMaterials);
 
-        float fuzz = LIST_OF_OBJS[current_item_index].material.metal.fuzz;
+        float fuzz = obj.material.metal.fuzz;
         ImGui::Text("Fuzz");
         if (ImGui::SliderFloat("Metal Fuzz", &fuzz, 0.0f, 1.0f))
         {
-            LIST_OF_OBJS[current_item_index].material.metal.fuzz = fuzz;
+            obj.material.metal.fuzz = fuzz;
             updateObjMaterials = true;
         }
     }
-    else if (current_item_material == ALL_MATERIALS[2])
+    else if (obj.current_instance_material == ALL_MATERIALS[2])
     {
-        float ref_idx = LIST_OF_OBJS[current_item_index].material.dielectric.ref_idx;
+        float ref_idx = obj.material.dielectric.ref_idx;
         ImGui::Text("Ref Index");
         if (ImGui::SliderFloat("Dielectric Ref Index", &ref_idx, 0.0f, 1.0f))
         {
-            LIST_OF_OBJS[current_item_index].material.dielectric.ref_idx = ref_idx;
+            obj.material.dielectric.ref_idx = ref_idx;
             updateObjMaterials = true;
         }
     }
 }
 
-void ConfigureImgui::updateMaterial()
+void ConfigureImgui::updateMaterial(Obj& obj)
 {
-    current_item_material = LIST_OF_OBJS[current_item_index].material.type;
+    obj.current_instance_material = obj.material.type;
     ImGui::Text("Loaded "); ImGui::SameLine();
-    if (ImGui::BeginCombo(" Material", current_item_material)) // The second parameter is the label previewed before opening the combo.
+    if (ImGui::BeginCombo(" Material", obj.current_instance_material)) // The second parameter is the label previewed before opening the combo.
     {
         for (int n = 0; n < ALL_MATERIALS.size(); n++)
         {
             const char* material = ALL_MATERIALS[n].c_str();
-            bool is_selected = (current_item_material == material); // You can store your selection however you want, outside or inside your objects
+            bool is_selected = (obj.current_instance_material == material); // You can store your selection however you want, outside or inside your objects
             if (ImGui::Selectable(material, is_selected))
             {
-                current_item_material = material;
-                LIST_OF_OBJS[current_item_index].material.type = material;
+                obj.current_instance_material = material;
+                obj.material.type = material;
                 updateObjMaterials = true;
             }
             if (is_selected)
@@ -181,7 +236,7 @@ void ConfigureImgui::updateMaterial()
         }
         ImGui::EndCombo();
     }
-    updateMaterialDetail();
+    updateMaterialDetail(obj);
 }
 
 void ConfigureImgui::renderObjCP()
@@ -190,39 +245,15 @@ void ConfigureImgui::renderObjCP()
     {
         ImGui::Begin("Obj Control Panel", &showObjControlPanel);
 
-        if (ImGui::Button("Add New Obj"))
+        for (int i = 0; i < LIST_OF_OBJS.size(); i++)
         {
-            addNewObj = !addNewObj;
-        }
-        addObj();
-        
-        ImGui::Text("Loaded "); ImGui::SameLine();
-        if (ImGui::BeginCombo(" Obj", current_item)) // The second parameter is the label previewed before opening the combo.
-        {
-            for (int n = 0; n < LIST_OF_OBJS.size(); n++)
+            const char* item = LIST_OF_OBJS[i].name.c_str();
+            if (ImGui::Button(item))
             {
-                const char* item = LIST_OF_OBJS[n].name.c_str();
-                bool is_selected = (current_item == item); // You can store your selection however you want, outside or inside your objects
-                if (LIST_OF_OBJS[n].choosed == false)
-                {
-                    continue;
-                }
-                if (ImGui::Selectable(item, is_selected))
-                {
-                    current_item = item;
-                    current_item_index = n;
-                }
-                if (is_selected)
-                {
-                    ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
-                }
+                LIST_OF_OBJS[i].openInstanceWindow = !LIST_OF_OBJS[i].openInstanceWindow;
             }
-            ImGui::EndCombo();
         }
-        if (current_item != NULL) {
-            updateTransform();
-            updateMaterial();
-        }
+        objInstances();
         ImGui::End();
     }
 }
