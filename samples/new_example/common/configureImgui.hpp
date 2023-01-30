@@ -21,11 +21,24 @@ struct Material
 };
 
 struct Obj {
+    
+    struct Instance {
+        std::string name;
+        bool choosed = false;
+        float3 transform;
+    };
+
     std::string name;
     std::string path;
-    bool choosed = false;
-    float3 transform;
     Material material;
+
+    bool openInstanceWindow = false;
+    bool addObjInstanceWindow = false;
+    std::vector<Instance> instances;
+    int SELECTED_OBJ_INSTANCE = 0;
+    const char* current_instance = NULL;
+    const char* current_instance_material = NULL;
+    int current_instance_index = -1;
 };
 
 struct LoadInObj {
@@ -36,10 +49,6 @@ struct LoadInObj {
 };
 
 struct ConfigureImgui {
-    const char* current_item = NULL;
-    const char* current_item_material = NULL;
-    int current_item_index = -1;
-
     struct CurrentLight
     {
         const char* name = NULL;
@@ -97,11 +106,12 @@ struct ConfigureImgui {
     void renderLightCP();
 
     void initObj();
-    void addObj();
+    void objInstances();
+    void addObjInstance(Obj& obj);
     void showSelectedObjCountWarning();
-    void updateTransform();
-    void updateMaterial();
-    void updateMaterialDetail();
+    void updateTransform(Obj& obj);
+    void updateMaterial(Obj& obj);
+    void updateMaterialDetail(Obj& obj);
 
     void initLight();
     void addLight();
