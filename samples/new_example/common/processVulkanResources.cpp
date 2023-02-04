@@ -83,7 +83,7 @@ void VulkanResources::createGeometry(int each_path) {
     geometry.colorBuffer = gprtDeviceBufferCreate<float3>(
         context, geometry.list_of_colors.size(), static_cast<const void *>(geometry.list_of_colors.data()));
 
-    geometry.geomData = gprtGeomGetPointer(geometry.trianglesGeom);
+    geometry.geomData = gprtGeomGetParameters(geometry.trianglesGeom);
     geometry.geomData->vertex = gprtBufferGetHandle(geometry.vertexBuffer);
     geometry.geomData->index = gprtBufferGetHandle(geometry.indexBuffer);
     geometry.geomData->normal = gprtBufferGetHandle(geometry.normalBuffer);
@@ -170,7 +170,7 @@ void VulkanResources::buildSBT()
     // ##################################################################
     // build *SBT* required to trace the groups
     // ##################################################################
-    gprtBuildPipeline(context);
+    // gprtBuildPipeline(context);
     gprtBuildShaderBindingTable(context, GPRT_SBT_ALL);
 }
 
@@ -290,13 +290,13 @@ void VulkanResources::createAccel() {
 
 void VulkanResources::createMiss() {
     // ----------- set variables  ----------------------------
-    missData = gprtMissGetPointer(miss);
+    missData = gprtMissGetParameters(miss);
     missData->color0 = float3(1.0f, 1.0f, 1.0f);
     missData->color1 = float3(0.0f, 0.0f, 0.0f);
 }
 
 void VulkanResources::updateLights() {
-    rayGenData = gprtRayGenGetPointer(rayGen);
+    rayGenData = gprtRayGenGetParameters(rayGen);
     // ----------- create lights  ----------------------------
     loadLights(
         list_of_ambient_lights_intensity,
