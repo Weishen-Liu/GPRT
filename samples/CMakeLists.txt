@@ -33,3 +33,4 @@ add_subdirectory(s09-visibilityMasks)
 add_subdirectory(s10-rasterization)
 
 add_subdirectory(new_example)
+add_subdirectory(new_example_volume)
