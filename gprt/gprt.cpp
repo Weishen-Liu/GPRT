@@ -62,25 +62,37 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
 
+
+/** @brief A collection of features that are requested to support before
+ * creating a GPRT context. These features might not be available on all
+ * platforms.
+ */
+static struct RequestedFeatures {
+  /** A window (VK_KHR_SURFACE, SWAPCHAIN, etc...)*/
+  bool window = false;
+  struct Window {
+    uint32_t initialWidth;
+    uint32_t initialHeight;
+    std::string title;
+  } windowProperties;
+
+    /*! returns whether logging is enabled */
+  inline static bool logging() {
+#ifdef NDEBUG
+    return false;
+#else
+    return true;
+#endif
+  }
+} requestedFeatures;
+
+
 #if defined(_MSC_VER)
 //&& !defined(__PRETTY_FUNCTION__)
 #define __PRETTY_FUNCTION__ __FUNCTION__
 #endif
 
-#if 1
-#define LOG_API_CALL() /* ignore */
-#else
-#define LOG_API_CALL() std::cout << "% " << __FUNCTION__ << "(...)" << std::endl;
-#endif
-
-#define LOG(message)                                                                                                   \
-  if (Context::logging())                                                                                              \
-  std::cout << GPRT_TERMINAL_LIGHT_BLUE << "#gprt: " << message << GPRT_TERMINAL_DEFAULT << std::endl
-
-#define LOG_OK(message)                                                                                                \
-  if (Context::logging())                                                                                              \
-  std::cout << GPRT_TERMINAL_BLUE << "#gprt: " << message << GPRT_TERMINAL_DEFAULT << std::endl
-
+// For error handling
 namespace detail {
 inline static std::string
 backtrace() {
@@ -132,6 +144,27 @@ gprtRaise_impl(std::string str) {
     std::cerr << std::string(__PRETTY_FUNCTION__) << " not implemented" << std::endl;                                  \
     assert(false);                                                                                                     \
   };
+
+#if 1
+#define LOG_API_CALL() /* ignore */
+#else
+#define LOG_API_CALL() std::cout << "% " << __FUNCTION__ << "(...)" << std::endl;
+#endif
+
+#define LOG_INFO(message)                                                                                                   \
+  if (RequestedFeatures::logging())                                                                                              \
+  std::cout << GPRT_TERMINAL_LIGHT_BLUE << "#gprt info:  " << message << GPRT_TERMINAL_DEFAULT << std::endl
+
+#define LOG_WARNING(message)                                                                                                   \
+  if (RequestedFeatures::logging())                                                                                              \
+  std::cout << GPRT_TERMINAL_YELLOW << "#gprt warn:  " << message << GPRT_TERMINAL_DEFAULT << std::endl
+
+#define LOG_ERROR(message)                                                                                                   \
+  {\
+    if (RequestedFeatures::logging())                                                                                              \
+    std::cout << GPRT_TERMINAL_RED << "#gprt error: " << message << GPRT_TERMINAL_DEFAULT << std::endl;  \
+    GPRT_RAISE(message) \
+  }
 
 std::string
 errorString(VkResult errorCode) {
@@ -325,7 +358,7 @@ struct Buffer {
       cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
       if (err)
-        GPRT_RAISE("failed to begin command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to begin command buffer for buffer map! : \n" + errorString(err));
 
       // To do, consider allowing users to specify offsets here...
       VkBufferCopy region;
@@ -336,7 +369,7 @@ struct Buffer {
 
       err = vkEndCommandBuffer(commandBuffer);
       if (err)
-        GPRT_RAISE("failed to end command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to end command buffer for buffer map! : \n" + errorString(err));
 
       VkSubmitInfo submitInfo;
       submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -351,11 +384,11 @@ struct Buffer {
 
       err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
       if (err)
-        GPRT_RAISE("failed to submit to queue for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to submit to queue for buffer map! : \n" + errorString(err));
 
       err = vkQueueWaitIdle(queue);
       if (err)
-        GPRT_RAISE("failed to wait for queue idle for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to wait for queue idle for buffer map! : \n" + errorString(err));
 
       // todo, transfer device data to host
       if (mapped)
@@ -377,7 +410,7 @@ struct Buffer {
       cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
       if (err)
-        GPRT_RAISE("failed to begin command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to begin command buffer for buffer map! : \n" + errorString(err));
 
       // To do, consider allowing users to specify offsets here...
       VkBufferCopy region;
@@ -388,7 +421,7 @@ struct Buffer {
 
       err = vkEndCommandBuffer(commandBuffer);
       if (err)
-        GPRT_RAISE("failed to end command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to end command buffer for buffer map! : \n" + errorString(err));
 
       VkSubmitInfo submitInfo;
       submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -403,11 +436,11 @@ struct Buffer {
 
       err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
       if (err)
-        GPRT_RAISE("failed to submit to queue for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to submit to queue for buffer map! : \n" + errorString(err));
 
       err = vkQueueWaitIdle(queue);
       if (err)
-        GPRT_RAISE("failed to wait for queue idle for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to wait for queue idle for buffer map! : \n" + errorString(err));
 
       // todo, transfer device data to device
       if (mapped) {
@@ -531,8 +564,9 @@ struct Buffer {
         *memTypeFound = false;
         return 0;
       } else {
-        GPRT_RAISE("Could not find a matching memory type");
+        LOG_ERROR("Could not find a matching memory type");
       }
+      return -1;
     };
 
     // Create the buffer handle
@@ -579,7 +613,7 @@ struct Buffer {
     // Attach the memory to the buffer object
     VkResult err = vkBindBufferMemory(device, buffer, memory, /* offset */ 0);
     if (err)
-      GPRT_RAISE("failed to bind buffer memory! : \n" + errorString(err));
+      LOG_ERROR("failed to bind buffer memory! : \n" + errorString(err));
 
     if (!hostVisible) {
       const VkMemoryPropertyFlags memoryPropertyFlags =
@@ -602,7 +636,7 @@ struct Buffer {
       // Attach the memory to the buffer object
       VkResult err = vkBindBufferMemory(device, stagingBuffer.buffer, stagingBuffer.memory, /* offset */ 0);
       if (err)
-        GPRT_RAISE("failed to bind staging buffer memory! : \n" + errorString(err));
+        LOG_ERROR("failed to bind staging buffer memory! : \n" + errorString(err));
     }
 
     // If a pointer to the buffer data has been passed, map the buffer and
@@ -834,7 +868,7 @@ struct Texture {
       // VkCommandBufferBeginInfo cmdBufInfo{};
       // cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       // err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
-      // if (err) GPRT_RAISE("failed to begin command buffer for texture map! :
+      // if (err) LOG_ERROR("failed to begin command buffer for texture map! :
       // \n" + errorString(err));
 
       // // transition device to a transfer source format
@@ -866,7 +900,7 @@ struct Texture {
       // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
       // err = vkEndCommandBuffer(commandBuffer);
-      // if (err) GPRT_RAISE("failed to end command buffer for texture map! :
+      // if (err) LOG_ERROR("failed to end command buffer for texture map! :
       // \n" + errorString(err));
 
       // VkSubmitInfo submitInfo;
@@ -882,11 +916,11 @@ struct Texture {
       // submitInfo.pSignalSemaphores =
       // nullptr;//&writeImageSemaphoreHandleList[currentImageIndex]}; err =
       // vkQueueSubmit(queue, 1, &submitInfo, nullptr); if (err)
-      // GPRT_RAISE("failed to submit to queue for texture map! : \n" +
+      // LOG_ERROR("failed to submit to queue for texture map! : \n" +
       // errorString(err));
 
       // err = vkQueueWaitIdle(queue);
-      // if (err) GPRT_RAISE("failed to wait for queue idle for texture map! :
+      // if (err) LOG_ERROR("failed to wait for queue idle for texture map! :
       // \n" + errorString(err));
 
       // todo, transfer device data to host
@@ -912,7 +946,7 @@ struct Texture {
       cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
       if (err)
-        GPRT_RAISE("failed to begin command buffer for texture map! : \n" + errorString(err));
+        LOG_ERROR("failed to begin command buffer for texture map! : \n" + errorString(err));
 
       // transition device to a transfer destination format
       setImageLayout(commandBuffer, image, layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -943,7 +977,7 @@ struct Texture {
 
       err = vkEndCommandBuffer(commandBuffer);
       if (err)
-        GPRT_RAISE("failed to end command buffer for texture map! : \n" + errorString(err));
+        LOG_ERROR("failed to end command buffer for texture map! : \n" + errorString(err));
 
       VkSubmitInfo submitInfo;
       submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -958,11 +992,11 @@ struct Texture {
 
       err = vkQueueSubmit(queue, 1, &submitInfo, nullptr);
       if (err)
-        GPRT_RAISE("failed to submit to queue for texture map! : \n" + errorString(err));
+        LOG_ERROR("failed to submit to queue for texture map! : \n" + errorString(err));
 
       err = vkQueueWaitIdle(queue);
       if (err)
-        GPRT_RAISE("failed to wait for queue idle for texture map! : \n" + errorString(err));
+        LOG_ERROR("failed to wait for queue idle for texture map! : \n" + errorString(err));
 
       // todo, transfer device data to device
       if (mapped) {
@@ -979,7 +1013,7 @@ struct Texture {
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
     if (err)
-      GPRT_RAISE("failed to begin command buffer for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to begin command buffer for texture mipmap generation! : \n" + errorString(err));
 
     // Move to a destination optimal format
     setImageLayout(commandBuffer, image, layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1007,7 +1041,7 @@ struct Texture {
 
     err = vkEndCommandBuffer(commandBuffer);
     if (err)
-      GPRT_RAISE("failed to end command buffer for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to end command buffer for texture mipmap generation! : \n" + errorString(err));
 
     VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1022,11 +1056,11 @@ struct Texture {
 
     err = vkQueueSubmit(queue, 1, &submitInfo, nullptr);
     if (err)
-      GPRT_RAISE("failed to submit to queue for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for texture mipmap generation! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for texture mipmap generation! : \n" + errorString(err));
   }
 
   void generateMipmap() {
@@ -1037,11 +1071,11 @@ struct Texture {
     // double check we have the right usage flags...
     // Shouldn't happen, but doesn't hurt to double check.
     if ((usageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
-      GPRT_RAISE("image needs transfer src usage bit for texture mipmap "
+      LOG_ERROR("image needs transfer src usage bit for texture mipmap "
                  "generation! \n");
 
     if ((usageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
-      GPRT_RAISE("image needs transfer dst usage bit for texture mipmap "
+      LOG_ERROR("image needs transfer dst usage bit for texture mipmap "
                  "generation! \n");
 
     VkResult err;
@@ -1049,7 +1083,7 @@ struct Texture {
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
     if (err)
-      GPRT_RAISE("failed to begin command buffer for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to begin command buffer for texture mipmap generation! : \n" + errorString(err));
 
     // transition device to a transfer destination format
     setImageLayout(commandBuffer, image, layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1139,7 +1173,7 @@ struct Texture {
 
     err = vkEndCommandBuffer(commandBuffer);
     if (err)
-      GPRT_RAISE("failed to end command buffer for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to end command buffer for texture mipmap generation! : \n" + errorString(err));
 
     VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1154,11 +1188,11 @@ struct Texture {
 
     err = vkQueueSubmit(queue, 1, &submitInfo, nullptr);
     if (err)
-      GPRT_RAISE("failed to submit to queue for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for texture mipmap generation! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for texture mipmap generation! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for texture mipmap generation! : \n" + errorString(err));
   }
 
   Texture(VkPhysicalDevice physicalDevice, VkDevice logicalDevice, VkCommandBuffer _commandBuffer, VkQueue _queue,
@@ -1239,8 +1273,9 @@ struct Texture {
         *memTypeFound = false;
         return 0;
       } else {
-        GPRT_RAISE("Could not find a matching memory type");
+        LOG_ERROR("Could not find a matching memory type");
       }
+      return -1;
     };
 
     // Create the image handle
@@ -1343,7 +1378,7 @@ struct Texture {
       // Attach the memory to the buffer object
       VkResult err = vkBindBufferMemory(device, stagingBuffer.buffer, stagingBuffer.memory, /* offset */ 0);
       if (err)
-        GPRT_RAISE("failed to bind staging buffer memory! : \n" + errorString(err));
+        LOG_ERROR("failed to bind staging buffer memory! : \n" + errorString(err));
     }
 
     // We need to transition the image into a known layout
@@ -1353,7 +1388,7 @@ struct Texture {
       cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
       if (err)
-        GPRT_RAISE("failed to begin command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to begin command buffer for buffer map! : \n" + errorString(err));
 
       setImageLayout(commandBuffer, image, layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      {uint32_t(aspectFlagBits), 0, mipLevels, 0, 1});
@@ -1361,7 +1396,7 @@ struct Texture {
 
       err = vkEndCommandBuffer(commandBuffer);
       if (err)
-        GPRT_RAISE("failed to end command buffer for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to end command buffer for buffer map! : \n" + errorString(err));
 
       VkSubmitInfo submitInfo;
       submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1376,11 +1411,11 @@ struct Texture {
 
       err = vkQueueSubmit(queue, 1, &submitInfo, nullptr);
       if (err)
-        GPRT_RAISE("failed to submit to queue for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to submit to queue for buffer map! : \n" + errorString(err));
 
       err = vkQueueWaitIdle(queue);
       if (err)
-        GPRT_RAISE("failed to wait for queue idle for buffer map! : \n" + errorString(err));
+        LOG_ERROR("failed to wait for queue idle for buffer map! : \n" + errorString(err));
     }
 
     // Now we need an image view
@@ -1666,7 +1701,7 @@ struct RayGen : public SBTEntry {
 
     VkResult err = vkCreateShaderModule(logicalDevice, &moduleCreateInfo, NULL, &shaderModule);
     if (err)
-      GPRT_RAISE("failed to create shader module! : \n" + errorString(err));
+      LOG_ERROR("failed to create shader module! : \n" + errorString(err));
 
     shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
@@ -2452,7 +2487,7 @@ struct TriangleAccel : public Accel {
       err = gprt::vkCreateAccelerationStructure(logicalDevice, &accelerationStructureCreateInfo, nullptr,
                                                 &accelerationStructure);
       if (err)
-        GPRT_RAISE("failed to create acceleration structure for triangle accel "
+        LOG_ERROR("failed to create acceleration structure for triangle accel "
                    "build! : \n" +
                    errorString(err));
     }
@@ -2498,14 +2533,14 @@ struct TriangleAccel : public Accel {
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
     if (err)
-      GPRT_RAISE("failed to begin command buffer for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to begin command buffer for triangle accel build! : \n" + errorString(err));
 
     gprt::vkCmdBuildAccelerationStructures(commandBuffer, 1, &accelerationBuildGeometryInfo,
                                            accelerationBuildStructureRangeInfoPtrs.data());
 
     err = vkEndCommandBuffer(commandBuffer);
     if (err)
-      GPRT_RAISE("failed to end command buffer for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to end command buffer for triangle accel build! : \n" + errorString(err));
 
     VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -2523,20 +2558,20 @@ struct TriangleAccel : public Accel {
     // fenceInfo.flags = 0;
     // VkFence fence;
     // err = vkCreateFence(logicalDevice, &fenceInfo, nullptr, &fence);
-    // if (err) GPRT_RAISE("failed to create fence for triangle accel build! :
+    // if (err) LOG_ERROR("failed to create fence for triangle accel build! :
     // \n" + errorString(err));
 
     err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
     if (err)
-      GPRT_RAISE("failed to submit to queue for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for triangle accel build! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for triangle accel build! : \n" + errorString(err));
 
     // Wait for the fence to signal that command buffer has finished executing
     // err = vkWaitForFences(logicalDevice, 1, &fence, VK_TRUE, 100000000000
-    // /*timeout*/); if (err) GPRT_RAISE("failed to wait for fence for triangle
+    // /*timeout*/); if (err) LOG_ERROR("failed to wait for fence for triangle
     // accel build! : \n" + errorString(err)); vkDestroyFence(logicalDevice,
     // fence, nullptr);
 
@@ -2666,7 +2701,7 @@ struct AABBAccel : public Accel {
       err = gprt::vkCreateAccelerationStructure(logicalDevice, &accelerationStructureCreateInfo, nullptr,
                                                 &accelerationStructure);
       if (err)
-        GPRT_RAISE("failed to create acceleration structure for AABB accel "
+        LOG_ERROR("failed to create acceleration structure for AABB accel "
                    "build! : \n" +
                    errorString(err));
     }
@@ -2712,14 +2747,14 @@ struct AABBAccel : public Accel {
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
     if (err)
-      GPRT_RAISE("failed to begin command buffer for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to begin command buffer for triangle accel build! : \n" + errorString(err));
 
     gprt::vkCmdBuildAccelerationStructures(commandBuffer, 1, &accelerationBuildGeometryInfo,
                                            accelerationBuildStructureRangeInfoPtrs.data());
 
     err = vkEndCommandBuffer(commandBuffer);
     if (err)
-      GPRT_RAISE("failed to end command buffer for triangle accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to end command buffer for triangle accel build! : \n" + errorString(err));
 
     VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -2734,11 +2769,11 @@ struct AABBAccel : public Accel {
 
     err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
     if (err)
-      GPRT_RAISE("failed to submit to queue for AABB accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for AABB accel build! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for AABB accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for AABB accel build! : \n" + errorString(err));
 
     VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
     accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -2825,7 +2860,7 @@ struct InstanceAccel : public Accel {
           AABBAccel *aabbAccel = (AABBAccel *) this->instances[j];
           numGeometry += aabbAccel->geometries.size();
         } else {
-          GPRT_RAISE("Unaccounted for BLAS type!");
+          LOG_ERROR("Unaccounted for BLAS type!");
         }
       }
       this->numGeometries = numGeometry;
@@ -2883,7 +2918,7 @@ struct InstanceAccel : public Accel {
 
   size_t getNumGeometries() {
     if (this->numGeometries == -1) {
-      GPRT_RAISE("Error, numGeometries for this instance must be set by the user!");
+      LOG_ERROR("Error, numGeometries for this instance must be set by the user!");
     }
     return this->numGeometries;
   }
@@ -2994,7 +3029,7 @@ struct InstanceAccel : public Accel {
           AABBAccel *aabbAccel = (AABBAccel *) this->instances[i];
           offset += aabbAccel->geometries.size() * numRayTypes;
         } else {
-          GPRT_RAISE("Error, unknown instance type");
+          LOG_ERROR("Error, unknown instance type");
         }
       }
       instanceOffsetsBuffer->map();
@@ -3061,11 +3096,11 @@ struct InstanceAccel : public Accel {
 
     err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
     if (err)
-      GPRT_RAISE("failed to submit to queue for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for instance accel build! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for instance accel build! : \n" + errorString(err));
 
     VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
     accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -3129,7 +3164,7 @@ struct InstanceAccel : public Accel {
       err = gprt::vkCreateAccelerationStructure(logicalDevice, &accelerationStructureCreateInfo, nullptr,
                                                 &accelerationStructure);
       if (err)
-        GPRT_RAISE("failed to create acceleration structure for instance accel "
+        LOG_ERROR("failed to create acceleration structure for instance accel "
                    "build! : \n" +
                    errorString(err));
     }
@@ -3183,14 +3218,14 @@ struct InstanceAccel : public Accel {
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     err = vkBeginCommandBuffer(commandBuffer, &cmdBufInfo);
     if (err)
-      GPRT_RAISE("failed to begin command buffer for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to begin command buffer for instance accel build! : \n" + errorString(err));
 
     gprt::vkCmdBuildAccelerationStructures(commandBuffer, 1, &accelerationBuildGeometryInfo,
                                            accelerationBuildStructureRangeInfoPtrs.data());
 
     err = vkEndCommandBuffer(commandBuffer);
     if (err)
-      GPRT_RAISE("failed to end command buffer for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to end command buffer for instance accel build! : \n" + errorString(err));
 
     // VkSubmitInfo submitInfo;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -3207,17 +3242,17 @@ struct InstanceAccel : public Accel {
 
     err = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
     if (err)
-      GPRT_RAISE("failed to submit to queue for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to submit to queue for instance accel build! : \n" + errorString(err));
 
     err = vkQueueWaitIdle(queue);
     if (err)
-      GPRT_RAISE("failed to wait for queue idle for instance accel build! : \n" + errorString(err));
+      LOG_ERROR("failed to wait for queue idle for instance accel build! : \n" + errorString(err));
 
     // // // Wait for the fence to signal that command buffer has finished
     // executing
     // // err = vkWaitForFences(logicalDevice, 1, &fence, VK_TRUE, 100000000000
     // /*timeout*/);
-    // // if (err) GPRT_RAISE("failed to wait for fence for instance accel
+    // // if (err) LOG_ERROR("failed to wait for fence for instance accel
     // build! : \n" + errorString(err));
     // // vkDestroyFence(logicalDevice, fence, nullptr);
 
@@ -3264,20 +3299,6 @@ struct InstanceAccel : public Accel {
     }
   };
 };
-
-/** @brief A collection of features that are requested to support before
- * creating a GPRT context. These features might not be available on all
- * platforms.
- */
-static struct RequestedFeatures {
-  /** A window (VK_KHR_SURFACE, SWAPCHAIN, etc...)*/
-  bool window = false;
-  struct Window {
-    uint32_t initialWidth;
-    uint32_t initialHeight;
-    std::string title;
-  } windowProperties;
-} requestedFeatures;
 
 struct Context {
   VkApplicationInfo appInfo;
@@ -3375,13 +3396,16 @@ struct Context {
   VkPipelineCache pipelineCache;
 
   // ray tracing pipeline and layout
-  VkPipeline pipeline = VK_NULL_HANDLE;
-  VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+  bool raytracingPipelineOutOfDate = true;
+  VkPipeline raytracingPipeline = VK_NULL_HANDLE;
+  VkPipelineLayout raytracingPipelineLayout = VK_NULL_HANDLE;
 
-  std::vector<Compute *> computePrograms;
   std::vector<RayGen *> raygenPrograms;
   std::vector<Miss *> missPrograms;
   std::vector<GeomType *> geomTypes;
+
+  bool computePipelinesOutOfDate = true;
+  bool rasterPipelinesOutOfDate = true;
 
   std::vector<Accel *> accels;
 
@@ -3400,6 +3424,7 @@ struct Context {
   VkDescriptorPool rasterRecordDescriptorPool = VK_NULL_HANDLE;
   VkDescriptorPool computeRecordDescriptorPool = VK_NULL_HANDLE;
 
+  // used to determine what descriptor sets need rebuilding
   uint32_t previousNumSamplers = 0;
   uint32_t previousNumTexture1Ds = 0;
   uint32_t previousNumTexture2Ds = 0;
@@ -3425,6 +3450,7 @@ struct Context {
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
   Buffer shaderBindingTable;
 
+
   uint32_t numRayTypes = 1;
 
   // struct InternalStages {
@@ -3436,15 +3462,6 @@ struct Context {
   // }
   Stage fillInstanceDataStage;
   Module *internalModule = nullptr;
-
-  /*! returns whether logging is enabled */
-  inline static bool logging() {
-#ifdef NDEBUG
-    return false;
-#else
-    return true;
-#endif
-  }
 
   /*! returns whether validation is enabled */
   inline static bool validation() {
@@ -3536,11 +3553,11 @@ struct Context {
     const char **glfwExtensions;
     if (requestedFeatures.window) {
       if (!glfwInit()) {
-        LOG("Warning: Unable to create window. Falling back to headless mode.");
+        LOG_WARNING("Unable to create window. Falling back to headless mode.");
         requestedFeatures.window = false;
       } else {
         if (!glfwVulkanSupported()) {
-          GPRT_RAISE("Window requested but unsupported!");
+          LOG_ERROR("Window requested but unsupported!");
         }
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
@@ -3572,7 +3589,7 @@ struct Context {
 
     err = vkCreateInstance(&instanceCreateInfo, nullptr, &instance);
     if (err) {
-      GPRT_RAISE("failed to create instance! : \n" + errorString(err));
+      LOG_ERROR("failed to create instance! : \n" + errorString(err));
     }
 
     /// 1.5 - create a window and surface if requested
@@ -3586,7 +3603,7 @@ struct Context {
 
       VkResult err = glfwCreateWindowSurface(instance, window, nullptr, &surface);
       if (err != VK_SUCCESS) {
-        GPRT_RAISE("failed to create window surface! : \n" + errorString(err));
+        LOG_ERROR("failed to create window surface! : \n" + errorString(err));
       }
       // Poll some initial event values
       glfwPollEvents();
@@ -3619,13 +3636,13 @@ struct Context {
     // Get number of available physical devices
     VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
     if (gpuCount == 0) {
-      GPRT_RAISE("No device with Vulkan support found : \n" + errorString(err));
+      LOG_ERROR("No device with Vulkan support found : \n" + errorString(err));
     }
     // Enumerate devices
     std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
     err = vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices.data());
     if (err) {
-      GPRT_RAISE("Could not enumerate physical devices : \n" + errorString(err));
+      LOG_ERROR("Could not enumerate physical devices : \n" + errorString(err));
     }
 
     // GPU selection
@@ -3707,7 +3724,7 @@ struct Context {
 
     std::vector<uint32_t> usableDevices;
 
-    LOG("Searching for usable Vulkan physical device...");
+    LOG_INFO("Searching for usable Vulkan physical device...");
     for (uint32_t i = 0; i < gpuCount; i++) {
       VkPhysicalDeviceProperties deviceProperties;
       vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
@@ -3717,24 +3734,25 @@ struct Context {
       message += std::string(", API : ") + std::to_string(deviceProperties.apiVersion >> 22) + std::string(".") +
                  std::to_string(((deviceProperties.apiVersion >> 12) & 0x3ff)) + std::string(".") +
                  std::to_string(deviceProperties.apiVersion & 0xfff);
-      LOG(message);
+      LOG_INFO(message);
 
       if (checkDeviceExtensionSupport(physicalDevices[i], enabledDeviceExtensions)) {
         usableDevices.push_back(i);
+        LOG_INFO("\tFound usable device");
       } else {
         /* Explain why we aren't using this device */
         for (const char *enabledExtension : enabledDeviceExtensions) {
           if (!extensionSupported(enabledExtension, supportedExtensions)) {
-            LOG("Device unusable... Requested device extension \"" << enabledExtension << "\" is not present.");
+            LOG_WARNING("\tDevice unusable... Requested device extension \"" << enabledExtension << "\" is not present.");
           }
         }
       }
     }
 
     if (usableDevices.size() == 0) {
-      GPRT_RAISE("Unable to find physical device meeting requirements\n");
+      LOG_ERROR("Unable to find physical device meeting requirements");
     } else {
-      LOG("Selecting first usable device");
+      LOG_INFO("Selecting first usable device");
       selectedDevice = usableDevices[0];
     }
 
@@ -3810,7 +3828,8 @@ struct Context {
       for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilyProperties.size()); i++)
         if (queueFamilyProperties[i].queueFlags & queueFlags)
           return i;
-      GPRT_RAISE("Could not find a matching queue family index");
+      LOG_ERROR("Could not find a matching queue family index");
+      return -1;
     };
 
     const float defaultQueuePriority(0.0f);
@@ -3943,7 +3962,7 @@ struct Context {
     // this->enabledFeatures = enabledFeatures;
     err = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &logicalDevice);
     if (err) {
-      GPRT_RAISE("Could not create logical devices : \n" + errorString(err));
+      LOG_ERROR("Could not create logical devices : \n" + errorString(err));
     }
 
     // Get the ray tracing and acceleration structure related function pointers
@@ -3997,7 +4016,7 @@ struct Context {
 
     err = vkCreateQueryPool(logicalDevice, &queryPoolCreateInfo, nullptr, &queryPool);
     if (err)
-      GPRT_RAISE("Failed to create time query pool!");
+      LOG_ERROR("Failed to create time query pool!\n" + errorString(err));
 
     /// 5. Allocate command buffers
     VkCommandBufferAllocateInfo cmdBufAllocateInfo{};
@@ -4008,17 +4027,17 @@ struct Context {
     cmdBufAllocateInfo.commandPool = graphicsCommandPool;
     err = vkAllocateCommandBuffers(logicalDevice, &cmdBufAllocateInfo, &graphicsCommandBuffer);
     if (err)
-      GPRT_RAISE("Could not create graphics command buffer : \n" + errorString(err));
+      LOG_ERROR("Could not create graphics command buffer : \n" + errorString(err));
 
     cmdBufAllocateInfo.commandPool = computeCommandPool;
     err = vkAllocateCommandBuffers(logicalDevice, &cmdBufAllocateInfo, &computeCommandBuffer);
     if (err)
-      GPRT_RAISE("Could not create compute command buffer : \n" + errorString(err));
+      LOG_ERROR("Could not create compute command buffer : \n" + errorString(err));
 
     cmdBufAllocateInfo.commandPool = transferCommandPool;
     err = vkAllocateCommandBuffers(logicalDevice, &cmdBufAllocateInfo, &transferCommandBuffer);
     if (err)
-      GPRT_RAISE("Could not create transfer command buffer : \n" + errorString(err));
+      LOG_ERROR("Could not create transfer command buffer : \n" + errorString(err));
 
     /// 6. Get queue handles
     vkGetDeviceQueue(logicalDevice, queueFamilyIndices.graphics, 0, &graphicsQueue);
@@ -4040,7 +4059,7 @@ struct Context {
       if (vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
           vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
           vkCreateFence(logicalDevice, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
-        GPRT_RAISE("Failed to create swapchain semaphores");
+        LOG_ERROR("Failed to create swapchain semaphores");
       }
     }
 
@@ -4066,7 +4085,7 @@ struct Context {
         if (formats[i].format == surfaceFormat.format && formats[i].colorSpace == surfaceFormat.colorSpace)
           surfaceFormatFound = true;
       if (!surfaceFormatFound)
-        GPRT_RAISE("Error, unable to find RGBA8 SRGB surface format...");
+        LOG_ERROR("Error, unable to find RGBA8 SRGB surface format...");
 
       // For now, we assume the user wants FIFO, which is similar to vsync.
       // All vulkan implementations must support FIFO per-spec, so it's
@@ -4084,7 +4103,7 @@ struct Context {
         if (presentModes[i] == presentMode)
           presentModeFound = true;
       if (!presentModeFound)
-        GPRT_RAISE("Error, unable to find vsync present mode...");
+        LOG_ERROR("Error, unable to find vsync present mode...");
 
       // Window extent is the number of pixels truly used by the surface. For
       // high dps displays (like on mac) the window extent might be larger
@@ -4140,7 +4159,7 @@ struct Context {
       // Create the swapchain
       err = vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapchain);
       if (err != VK_SUCCESS) {
-        GPRT_RAISE("Error, failed to create swap chain : \n" + errorString(err));
+        LOG_ERROR("Error, failed to create swap chain : \n" + errorString(err));
       }
 
       // Now, receive the swapchain images
@@ -4356,10 +4375,10 @@ struct Context {
     if (surface)
       vkDestroySurfaceKHR(instance, surface, nullptr);
 
-    if (pipelineLayout)
-      vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-    if (pipeline)
-      vkDestroyPipeline(logicalDevice, pipeline, nullptr);
+    if (raytracingPipelineLayout)
+      vkDestroyPipelineLayout(logicalDevice, raytracingPipelineLayout, nullptr);
+    if (raytracingPipeline)
+      vkDestroyPipeline(logicalDevice, raytracingPipeline, nullptr);
 
     if (fillInstanceDataStage.layout)
       vkDestroyPipelineLayout(logicalDevice, fillInstanceDataStage.layout, nullptr);
@@ -4406,10 +4425,10 @@ struct Context {
       const uint32_t sbtSize = groupCount * handleSize;
 
       std::vector<uint8_t> shaderHandleStorage(sbtSize);
-      VkResult err = gprt::vkGetRayTracingShaderGroupHandles(logicalDevice, pipeline, 0, groupCount, sbtSize,
+      VkResult err = gprt::vkGetRayTracingShaderGroupHandles(logicalDevice, raytracingPipeline, 0, groupCount, sbtSize,
                                                              shaderHandleStorage.data());
       if (err)
-        GPRT_RAISE("failed to get ray tracing shader group handles! : \n" + errorString(err));
+        LOG_ERROR("failed to get ray tracing shader group handles! : \n" + errorString(err));
 
       const VkBufferUsageFlags bufferUsageFlags =
           // means we can use this buffer as a SBT
@@ -4439,25 +4458,6 @@ struct Context {
       }
       shaderBindingTable.map();
       uint8_t *mapped = ((uint8_t *) (shaderBindingTable.mapped));
-
-      // Compute records
-      if (computePrograms.size() > 0) {
-        for (uint32_t idx = 0; idx < computePrograms.size(); ++idx) {
-          size_t recordStride = recordSize;
-          size_t handleStride = handleSize;
-
-          // First, copy handle
-          size_t recordOffset = recordStride * idx;
-          size_t handleOffset = handleStride * idx;
-          memcpy(mapped + recordOffset, shaderHandleStorage.data() + handleOffset, handleSize);
-
-          // Then, copy params following handle
-          recordOffset = recordOffset + handleSize;
-          uint8_t *params = mapped + recordOffset;
-          Compute *compute = computePrograms[idx];
-          memcpy(params, compute->SBTRecord, compute->recordSize);
-        }
-      }
 
       // Raygen records
       if (raygenPrograms.size() > 0) {
@@ -4573,7 +4573,7 @@ struct Context {
               }
 
               else {
-                GPRT_RAISE("Unaccounted for BLAS type!");
+                LOG_ERROR("Unaccounted for BLAS type!");
               }
             }
           }
@@ -4619,6 +4619,8 @@ struct Context {
       vkDestroyDescriptorSetLayout(logicalDevice, samplerDescriptorSetLayout, nullptr);
       vkDestroyDescriptorPool(logicalDevice, samplerDescriptorPool, nullptr);
       samplerDescriptorPool = VK_NULL_HANDLE;
+
+      LOG_INFO("Reallocating texture sampler space");
     }
     if (!samplerDescriptorPool) {
       VkDescriptorPoolSize poolSize;
@@ -4704,6 +4706,12 @@ struct Context {
       vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // After this, we'll need to rebuild our pipelines since our descriptor
+      // set layouts changed.
+      raytracingPipelineOutOfDate = true;
+      computePipelinesOutOfDate = true;
+      rasterPipelinesOutOfDate = true;
+
       // Finally, keep track of if the texture count here changes
       previousNumSamplers = poolSize.descriptorCount;
     }
@@ -4715,6 +4723,8 @@ struct Context {
       vkDestroyDescriptorSetLayout(logicalDevice, texture1DDescriptorSetLayout, nullptr);
       vkDestroyDescriptorPool(logicalDevice, texture1DDescriptorPool, nullptr);
       texture1DDescriptorPool = VK_NULL_HANDLE;
+
+      LOG_INFO("Reallocating texture1D space");
     }
     if (!texture1DDescriptorPool) {
       VkDescriptorPoolSize poolSize;
@@ -4805,6 +4815,12 @@ struct Context {
       vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // After this, we'll need to rebuild our pipelines since our descriptor
+      // set layouts changed.
+      raytracingPipelineOutOfDate = true;
+      computePipelinesOutOfDate = true;
+      rasterPipelinesOutOfDate = true;
+
       // Finally, keep track of if the texture count here changes
       previousNumTexture1Ds = Texture::texture1Ds.size();
     }
@@ -4816,6 +4832,8 @@ struct Context {
       vkDestroyDescriptorSetLayout(logicalDevice, texture2DDescriptorSetLayout, nullptr);
       vkDestroyDescriptorPool(logicalDevice, texture2DDescriptorPool, nullptr);
       texture2DDescriptorPool = VK_NULL_HANDLE;
+
+      LOG_INFO("Reallocating texture2D space");
     }
     if (!texture2DDescriptorPool) {
       VkDescriptorPoolSize poolSize;
@@ -4906,6 +4924,12 @@ struct Context {
       vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // After this, we'll need to rebuild our pipelines since our descriptor
+      // set layouts changed.
+      raytracingPipelineOutOfDate = true;
+      computePipelinesOutOfDate = true;
+      rasterPipelinesOutOfDate = true;
+
       // Finally, keep track of if the texture count here changes
       previousNumTexture2Ds = Texture::texture2Ds.size();
     }
@@ -4917,6 +4941,8 @@ struct Context {
       vkDestroyDescriptorSetLayout(logicalDevice, texture3DDescriptorSetLayout, nullptr);
       vkDestroyDescriptorPool(logicalDevice, texture3DDescriptorPool, nullptr);
       texture3DDescriptorPool = VK_NULL_HANDLE;
+
+      LOG_INFO("Reallocating texture3D space");
     }
     if (!texture3DDescriptorPool) {
       VkDescriptorPoolSize poolSize;
@@ -5007,15 +5033,24 @@ struct Context {
       vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // After this, we'll need to rebuild our pipelines since our descriptor
+      // set layouts changed.
+      raytracingPipelineOutOfDate = true;
+      computePipelinesOutOfDate = true;
+      rasterPipelinesOutOfDate = true;
+
       // Finally, keep track of if the texture count here changes
       previousNumTexture3Ds = Texture::texture3Ds.size();
     }
 
-    // If the number of records has changed, we need to make a new descriptor pool
+    // If the number of raster records has changed, we need to make a new buffer of 
+    // raster program records
     if (rasterRecordBuffer && previousNumRasterRecords != Geom::geoms.size()) {
       rasterRecordBuffer->destroy();
       delete rasterRecordBuffer;
       rasterRecordBuffer = nullptr;
+
+      LOG_INFO("Reallocating rasterizer record space");
     }
     if (!rasterRecordBuffer) {
       // Create buffer to contain uniform buffer data
@@ -5066,15 +5101,21 @@ struct Context {
       // We'll write these descriptors now, but the actual recordBuffer will be written to later.
       vkUpdateDescriptorSets(logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
 
+      // We're only updating an existing descriptor set here, so we don't 
+      // need to mark our raster pipelines as "outdated" from this.
+
       // Finally, keep track of if the record count here changes
       previousNumRasterRecords = Geom::geoms.size();
     }
 
-    // If the number of records has changed, we need to make a new descriptor pool
+    // If the number of compute records has changed, we need to make a new buffer of 
+    // compute records
     if (computeRecordBuffer && previousNumComputeRecords != Compute::computes.size()) {
       computeRecordBuffer->destroy();
       delete computeRecordBuffer;
       computeRecordBuffer = nullptr;
+
+      LOG_INFO("Reallocating compute record space");
     }
     if (!computeRecordBuffer) {
       // Create buffer to contain uniform buffer data
@@ -5125,184 +5166,194 @@ struct Context {
       // We'll write these descriptors now, but the actual recordBuffer will be written to later.
       vkUpdateDescriptorSets(logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
 
+      // We're only updating an existing descriptor set here, so we don't 
+      // need to mark our compute pipelines as "outdated" from this.
+
       // Finally, keep track of if the record count here changes
       previousNumComputeRecords = Compute::computes.size();
     }
 
-    // Build the ray tracing pipeline
-    VkPushConstantRange pushConstantRange = {};
-    pushConstantRange.size = 128;
-    pushConstantRange.offset = 0;
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
-                                   VK_SHADER_STAGE_INTERSECTION_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR |
-                                   VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    // Build / update the ray tracing pipeline if required
+    if (raytracingPipelineOutOfDate) {
+      LOG_INFO("Building ray tracing pipeline");
+    
+      VkPushConstantRange pushConstantRange = {};
+      pushConstantRange.size = 128;
+      pushConstantRange.offset = 0;
+      pushConstantRange.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
+                                    VK_SHADER_STAGE_INTERSECTION_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR |
+                                    VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCI{};
-    pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    std::vector<VkDescriptorSetLayout> layouts = {
-        samplerDescriptorSetLayout,
-        texture1DDescriptorSetLayout,
-        texture2DDescriptorSetLayout,
-        texture3DDescriptorSetLayout,
-    };
-    pipelineLayoutCI.setLayoutCount = layouts.size();
-    pipelineLayoutCI.pSetLayouts = layouts.data();
+      VkPipelineLayoutCreateInfo pipelineLayoutCI{};
+      pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+      std::vector<VkDescriptorSetLayout> layouts = {
+          samplerDescriptorSetLayout,
+          texture1DDescriptorSetLayout,
+          texture2DDescriptorSetLayout,
+          texture3DDescriptorSetLayout,
+      };
+      pipelineLayoutCI.setLayoutCount = layouts.size();
+      pipelineLayoutCI.pSetLayouts = layouts.data();
 
-    pipelineLayoutCI.pushConstantRangeCount = 1;
-    pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
+      pipelineLayoutCI.pushConstantRangeCount = 1;
+      pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
 
-    if (pipelineLayout != VK_NULL_HANDLE) {
-      vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-      pipelineLayout = VK_NULL_HANDLE;
-    }
-    VK_CHECK_RESULT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
-
-    /*
-      Setup ray tracing shader groups
-    */
-    std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-    shaderGroups.clear();
-
-    // Ray generation groups
-    {
-      for (auto raygen : raygenPrograms) {
-        shaderStages.push_back(raygen->shaderStage);
-        VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
-        shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-        shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-        shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-        shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-        shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-        shaderGroups.push_back(shaderGroup);
+      if (raytracingPipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(logicalDevice, raytracingPipelineLayout, nullptr);
+        raytracingPipelineLayout = VK_NULL_HANDLE;
       }
-    }
+      VK_CHECK_RESULT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCI, nullptr, &raytracingPipelineLayout));
 
-    // Miss group
-    {
-      for (auto miss : missPrograms) {
-        shaderStages.push_back(miss->shaderStage);
-        VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
-        shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-        shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-        shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-        shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-        shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-        shaderGroups.push_back(shaderGroup);
+      /*
+        Setup ray tracing shader groups
+      */
+      std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+      shaderGroups.clear();
+
+      // Ray generation groups
+      {
+        for (auto raygen : raygenPrograms) {
+          shaderStages.push_back(raygen->shaderStage);
+          VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+          shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+          shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+          shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+          shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+          shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+          shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+          shaderGroups.push_back(shaderGroup);
+        }
       }
-    }
 
-    // Hit groups
+      // Miss group
+      {
+        for (auto miss : missPrograms) {
+          shaderStages.push_back(miss->shaderStage);
+          VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+          shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+          shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+          shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+          shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+          shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+          shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+          shaderGroups.push_back(shaderGroup);
+        }
+      }
 
-    // Go over all TLAS by order they were created
-    for (int tlasID = 0; tlasID < accels.size(); ++tlasID) {
-      Accel *tlas = accels[tlasID];
-      if (!tlas)
-        continue;
-      if (tlas->getType() == GPRT_INSTANCE_ACCEL) {
-        // Iterate over all BLAS stored in the TLAS
-        InstanceAccel *instanceAccel = (InstanceAccel *) tlas;
-        for (int blasID = 0; blasID < instanceAccel->instances.size(); ++blasID) {
-          Accel *blas = instanceAccel->instances[blasID];
-          // Handle different BLAS types...
-          if (blas->getType() == GPRT_TRIANGLE_ACCEL) {
-            TriangleAccel *triAccel = (TriangleAccel *) blas;
-            // Add a record for every geometry-raytype permutation
-            for (int geomID = 0; geomID < triAccel->geometries.size(); ++geomID) {
-              auto &geom = triAccel->geometries[geomID];
-              for (int rayType = 0; rayType < numRayTypes; ++rayType) {
-                VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
-                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+      // Hit groups
 
-                // init all to unused
-                shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+      // Go over all TLAS by order they were created
+      for (int tlasID = 0; tlasID < accels.size(); ++tlasID) {
+        Accel *tlas = accels[tlasID];
+        if (!tlas)
+          continue;
+        if (tlas->getType() == GPRT_INSTANCE_ACCEL) {
+          // Iterate over all BLAS stored in the TLAS
+          InstanceAccel *instanceAccel = (InstanceAccel *) tlas;
+          for (int blasID = 0; blasID < instanceAccel->instances.size(); ++blasID) {
+            Accel *blas = instanceAccel->instances[blasID];
+            // Handle different BLAS types...
+            if (blas->getType() == GPRT_TRIANGLE_ACCEL) {
+              TriangleAccel *triAccel = (TriangleAccel *) blas;
+              // Add a record for every geometry-raytype permutation
+              for (int geomID = 0; geomID < triAccel->geometries.size(); ++geomID) {
+                auto &geom = triAccel->geometries[geomID];
+                for (int rayType = 0; rayType < numRayTypes; ++rayType) {
+                  VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+                  shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                  shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
 
-                // populate hit group programs using geometry type
-                if (geom->geomType->closestHitShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->closestHitShaderStages[rayType]);
-                  shaderGroup.closestHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  // init all to unused
+                  shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+                  // populate hit group programs using geometry type
+                  if (geom->geomType->closestHitShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->closestHitShaderStages[rayType]);
+                    shaderGroup.closestHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+
+                  if (geom->geomType->anyHitShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->anyHitShaderStages[rayType]);
+                    shaderGroup.anyHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+
+                  if (geom->geomType->intersectionShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->intersectionShaderStages[rayType]);
+                    shaderGroup.intersectionShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+                  shaderGroups.push_back(shaderGroup);
                 }
-
-                if (geom->geomType->anyHitShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->anyHitShaderStages[rayType]);
-                  shaderGroup.anyHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-                }
-
-                if (geom->geomType->intersectionShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->intersectionShaderStages[rayType]);
-                  shaderGroup.intersectionShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-                }
-                shaderGroups.push_back(shaderGroup);
               }
-            }
-          } else if (blas->getType() == GPRT_AABB_ACCEL) {
-            AABBAccel *aabbAccel = (AABBAccel *) blas;
-            // Add a record for every geometry-raytype permutation
-            for (int geomID = 0; geomID < aabbAccel->geometries.size(); ++geomID) {
-              auto &geom = aabbAccel->geometries[geomID];
-              for (int rayType = 0; rayType < numRayTypes; ++rayType) {
-                VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
-                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
+            } else if (blas->getType() == GPRT_AABB_ACCEL) {
+              AABBAccel *aabbAccel = (AABBAccel *) blas;
+              // Add a record for every geometry-raytype permutation
+              for (int geomID = 0; geomID < aabbAccel->geometries.size(); ++geomID) {
+                auto &geom = aabbAccel->geometries[geomID];
+                for (int rayType = 0; rayType < numRayTypes; ++rayType) {
+                  VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+                  shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                  shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
 
-                // init all to unused
-                shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+                  // init all to unused
+                  shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                  shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
 
-                // populate hit group programs using geometry type
-                if (geom->geomType->closestHitShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->closestHitShaderStages[rayType]);
-                  shaderGroup.closestHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  // populate hit group programs using geometry type
+                  if (geom->geomType->closestHitShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->closestHitShaderStages[rayType]);
+                    shaderGroup.closestHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+
+                  if (geom->geomType->anyHitShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->anyHitShaderStages[rayType]);
+                    shaderGroup.anyHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+
+                  if (geom->geomType->intersectionShaderUsed[rayType]) {
+                    shaderStages.push_back(geom->geomType->intersectionShaderStages[rayType]);
+                    shaderGroup.intersectionShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                  }
+                  shaderGroups.push_back(shaderGroup);
                 }
-
-                if (geom->geomType->anyHitShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->anyHitShaderStages[rayType]);
-                  shaderGroup.anyHitShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-                }
-
-                if (geom->geomType->intersectionShaderUsed[rayType]) {
-                  shaderStages.push_back(geom->geomType->intersectionShaderStages[rayType]);
-                  shaderGroup.intersectionShader = static_cast<uint32_t>(shaderStages.size()) - 1;
-                }
-                shaderGroups.push_back(shaderGroup);
               }
+            } else {
+              LOG_ERROR("Unaccounted for BLAS type!");
             }
-          } else {
-            GPRT_RAISE("Unaccounted for BLAS type!");
           }
         }
       }
-    }
 
-    if (shaderStages.size() > 0) {
-      /*
-        Create the ray tracing pipeline
-      */
-      VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
-      rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-      rayTracingPipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-      rayTracingPipelineCI.pStages = shaderStages.data();
-      rayTracingPipelineCI.groupCount = static_cast<uint32_t>(shaderGroups.size());
-      rayTracingPipelineCI.pGroups = shaderGroups.data();
-      rayTracingPipelineCI.maxPipelineRayRecursionDepth = 1;   // WHA!?
-      rayTracingPipelineCI.layout = pipelineLayout;
+      if (shaderStages.size() > 0) {
+        /*
+          Create the ray tracing pipeline
+        */
+        VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
+        rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+        rayTracingPipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
+        rayTracingPipelineCI.pStages = shaderStages.data();
+        rayTracingPipelineCI.groupCount = static_cast<uint32_t>(shaderGroups.size());
+        rayTracingPipelineCI.pGroups = shaderGroups.data();
+        rayTracingPipelineCI.maxPipelineRayRecursionDepth = 1;   // WHA!?
+        rayTracingPipelineCI.layout = raytracingPipelineLayout;
 
-      if (pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(logicalDevice, pipeline, nullptr);
-        pipeline = VK_NULL_HANDLE;
+        if (raytracingPipeline != VK_NULL_HANDLE) {
+          vkDestroyPipeline(logicalDevice, raytracingPipeline, nullptr);
+          raytracingPipeline = VK_NULL_HANDLE;
+        }
+        VkResult err = gprt::vkCreateRayTracingPipelines(logicalDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1,
+                                                        &rayTracingPipelineCI, nullptr, &raytracingPipeline);
+        if (err) {
+          LOG_ERROR("failed to create ray tracing pipeline! : \n" + errorString(err));
+        }
       }
-      VkResult err = gprt::vkCreateRayTracingPipelines(logicalDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1,
-                                                       &rayTracingPipelineCI, nullptr, &pipeline);
-      if (err) {
-        GPRT_RAISE("failed to create ray tracing pipeline! : \n" + errorString(err));
-      }
+
+      // Mark our ray tracing pipeline as "updated".
+      raytracingPipelineOutOfDate = false;
     }
   }
 
@@ -5458,6 +5509,16 @@ gprtWindowShouldClose(GPRTContext _context) {
 
   glfwPollEvents();
   return glfwWindowShouldClose(context->window);
+}
+
+GPRT_API void
+gprtSetWindowTitle(GPRTContext _context, const char *title) {
+  LOG_API_CALL();
+  Context *context = (Context *) _context;
+  if (!requestedFeatures.window)
+    return;
+
+  glfwSetWindowTitle(context->window, title);
 }
 
 GPRT_API void
@@ -5791,7 +5852,6 @@ GPRT_API GPRTContext
 gprtContextCreate(int32_t *requestedDeviceIDs, int numRequestedDevices) {
   LOG_API_CALL();
   Context *context = new Context(requestedDeviceIDs, numRequestedDevices);
-  LOG("context created...");
   return (GPRTContext) context;
 }
 
@@ -5802,7 +5862,6 @@ gprtContextDestroy(GPRTContext _context) {
   context->destroy();
   delete context;
   context = nullptr;
-  LOG("context destroyed...");
 }
 
 GPRT_API void
@@ -5824,7 +5883,6 @@ gprtModuleCreate(GPRTContext _context, GPRTProgram spvCode) {
   LOG_API_CALL();
   Context *context = (Context *) _context;
   Module *module = new Module(spvCode);
-  LOG("module created...");
   return (GPRTModule) module;
 }
 
@@ -5834,7 +5892,6 @@ gprtModuleDestroy(GPRTModule _module) {
   Module *module = (Module *) _module;
   delete module;
   module = nullptr;
-  LOG("module destroyed...");
 }
 
 GPRT_API GPRTGeom
@@ -5847,7 +5904,6 @@ gprtGeomCreate(GPRTContext _context, GPRTGeomType _geomType) {
   // function to construct the appropriate geometry
   Geom *geometry = geomType->createGeom();
   return (GPRTGeom) geometry;
-  LOG("geometry created...");
 }
 
 GPRT_API void
@@ -5857,11 +5913,10 @@ gprtGeomDestroy(GPRTGeom _geometry) {
   geometry->destroy();
   delete geometry;
   geometry = nullptr;
-  LOG("geometry destroyed...");
 }
 
 GPRT_API void *
-gprtGeomGetPointer(GPRTGeom _geometry, int deviceID) {
+gprtGeomGetParameters(GPRTGeom _geometry, int deviceID) {
   LOG_API_CALL();
   Geom *geometry = (Geom *) _geometry;
   return geometry->SBTRecord;
@@ -5987,7 +6042,7 @@ gprtGeomTypeRasterize(GPRTContext _context, GPRTGeomType _geomType, uint32_t num
 
   err = vkEndCommandBuffer(context->graphicsCommandBuffer);
   if (err)
-    GPRT_RAISE("failed to end command buffer! : \n" + errorString(err));
+    LOG_ERROR("failed to end command buffer! : \n" + errorString(err));
 
   VkSubmitInfo submitInfo;
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -6002,11 +6057,11 @@ gprtGeomTypeRasterize(GPRTContext _context, GPRTGeomType _geomType, uint32_t num
 
   err = vkQueueSubmit(context->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
   if (err)
-    GPRT_RAISE("failed to submit to queue! : \n" + errorString(err));
+    LOG_ERROR("failed to submit to queue! : \n" + errorString(err));
 
   err = vkQueueWaitIdle(context->graphicsQueue);
   if (err)
-    GPRT_RAISE("failed to wait for queue idle! : \n" + errorString(err));
+    LOG_ERROR("failed to wait for queue idle! : \n" + errorString(err));
 }
 
 // ==================================================================
@@ -6018,7 +6073,6 @@ gprtTrianglesSetVertices(GPRTGeom _triangles, GPRTBuffer _vertices, size_t count
   TriangleGeom *triangles = (TriangleGeom *) _triangles;
   Buffer *vertices = (Buffer *) _vertices;
   triangles->setVertices(vertices, count, stride, offset);
-  LOG("Setting triangle vertices...");
 }
 
 // GPRT_API void gprtTrianglesSetMotionVertices(GPRTGeom triangles,
@@ -6044,7 +6098,6 @@ gprtTrianglesSetIndices(GPRTGeom _triangles, GPRTBuffer _indices, size_t count, 
   TriangleGeom *triangles = (TriangleGeom *) _triangles;
   Buffer *indices = (Buffer *) _indices;
   triangles->setIndices(indices, count, stride, offset);
-  LOG("Setting triangle indices...");
 }
 
 void
@@ -6053,7 +6106,6 @@ gprtAABBsSetPositions(GPRTGeom _aabbs, GPRTBuffer _positions, size_t count, size
   AABBGeom *aabbs = (AABBGeom *) _aabbs;
   Buffer *positions = (Buffer *) _positions;
   aabbs->setAABBs(positions, count, stride, offset);
-  LOG("Setting AABB positions...");
 }
 
 GPRT_API GPRTRayGen
@@ -6066,7 +6118,9 @@ gprtRayGenCreate(GPRTContext _context, GPRTModule _module, const char *programNa
 
   context->raygenPrograms.push_back(raygen);
 
-  LOG("raygen created...");
+  // Creating a raygen program requires rebuilding a RT pipeline.
+  context->raytracingPipelineOutOfDate = true;
+  
   return (GPRTRayGen) raygen;
 }
 
@@ -6077,11 +6131,12 @@ gprtRayGenDestroy(GPRTRayGen _rayGen) {
   rayGen->destroy();
   delete rayGen;
   rayGen = nullptr;
-  LOG("raygen destroyed...");
+
+  // todo, remove from context->raygenPrograms, rebuild pipelines
 }
 
 GPRT_API void *
-gprtRayGenGetPointer(GPRTRayGen _rayGen, int deviceID) {
+gprtRayGenGetParameters(GPRTRayGen _rayGen, int deviceID) {
   LOG_API_CALL();
   RayGen *rayGen = (RayGen *) _rayGen;
   return rayGen->SBTRecord;
@@ -6095,9 +6150,9 @@ gprtComputeCreate(GPRTContext _context, GPRTModule _module, const char *programN
 
   Compute *compute = new Compute(context->logicalDevice, module, programName, recordSize);
 
-  context->computePrograms.push_back(compute);
+  // Notify context that we need to build this compute pipeline
+  context->computePipelinesOutOfDate = true;
 
-  LOG("compute created...");
   return (GPRTCompute) compute;
 }
 
@@ -6108,11 +6163,10 @@ gprtComputeDestroy(GPRTCompute _compute) {
   compute->destroy();
   delete compute;
   compute = nullptr;
-  LOG("compute destroyed...");
 }
 
 GPRT_API void *
-gprtComputeGetPointer(GPRTCompute _compute, int deviceID) {
+gprtComputeGetParameters(GPRTCompute _compute, int deviceID) {
   LOG_API_CALL();
   Compute *compute = (Compute *) _compute;
   return compute->SBTRecord;
@@ -6128,7 +6182,9 @@ gprtMissCreate(GPRTContext _context, GPRTModule _module, const char *programName
 
   context->missPrograms.push_back(missProg);
 
-  LOG("miss program created...");
+  // Creating a miss program requires rebuilding a RT pipeline.
+  context->raytracingPipelineOutOfDate = true;
+
   return (GPRTMiss) missProg;
 }
 
@@ -6145,11 +6201,12 @@ gprtMissDestroy(GPRTMiss _miss) {
   missProg->destroy();
   delete missProg;
   missProg = nullptr;
-  LOG("miss program destroyed...");
+
+  // todo, update context->missPrograms list... rebuild pipelines
 }
 
 GPRT_API void *
-gprtMissGetPointer(GPRTMiss _miss, int deviceID) {
+gprtMissGetParameters(GPRTMiss _miss, int deviceID) {
   LOG_API_CALL();
   Miss *miss = (Miss *) _miss;
   return miss->SBTRecord;
@@ -6176,7 +6233,6 @@ gprtGeomTypeCreate(GPRTContext _context, GPRTGeomKind kind, size_t recordSize) {
 
   context->geomTypes.push_back(geomType);
 
-  LOG("geom type created...");
   return (GPRTGeomType) geomType;
 }
 
@@ -6187,7 +6243,6 @@ gprtGeomTypeDestroy(GPRTGeomType _geomType) {
   geomType->destroy();
   delete geomType;
   geomType = nullptr;
-  LOG("geom type destroyed...");
 }
 
 GPRT_API void
@@ -6197,7 +6252,6 @@ gprtGeomTypeSetClosestHitProg(GPRTGeomType _geomType, int rayType, GPRTModule _m
   Module *module = (Module *) _module;
 
   geomType->setClosestHit(rayType, module, progName);
-  LOG("assigning closest hit program to geom type...");
 }
 
 GPRT_API void
@@ -6207,7 +6261,6 @@ gprtGeomTypeSetAnyHitProg(GPRTGeomType _geomType, int rayType, GPRTModule _modul
   Module *module = (Module *) _module;
 
   geomType->setAnyHit(rayType, module, progName);
-  LOG("assigning any hit program to geom type...");
 }
 
 GPRT_API void
@@ -6217,7 +6270,6 @@ gprtGeomTypeSetIntersectionProg(GPRTGeomType _geomType, int rayType, GPRTModule 
   Module *module = (Module *) _module;
 
   geomType->setIntersection(rayType, module, progName);
-  LOG("assigning intersect program to geom type...");
 }
 
 GPRT_API void
@@ -6227,7 +6279,6 @@ gprtGeomTypeSetVertexProg(GPRTGeomType _geomType, int rasterType, GPRTModule _mo
   Module *module = (Module *) _module;
 
   geomType->setVertex(rasterType, module, progName);
-  LOG("assigning vertex program to geom type...");
 }
 
 GPRT_API void
@@ -6237,7 +6288,6 @@ gprtGeomTypeSetPixelProg(GPRTGeomType _geomType, int rasterType, GPRTModule _mod
   Module *module = (Module *) _module;
 
   geomType->setPixel(rasterType, module, progName);
-  LOG("assigning pixel program to geom type...");
 }
 
 GPRT_API void
@@ -6417,7 +6467,6 @@ gprtTextureDestroy(GPRTTexture _texture) {
   texture->destroy();
   delete texture;
   texture = nullptr;
-  LOG("texture destroyed");
 }
 
 GPRT_API GPRTBuffer
@@ -6450,7 +6499,6 @@ gprtHostBufferCreate(GPRTContext _context, size_t size, size_t count, const void
     void *mapped = buffer->mapped;
     memcpy(mapped, init, size * count);
   }
-  LOG("buffer created");
   return (GPRTBuffer) buffer;
 }
 
@@ -6481,7 +6529,6 @@ gprtDeviceBufferCreate(GPRTContext _context, size_t size, size_t count, const vo
     memcpy(mapped, init, size * count);
     buffer->unmap();
   }
-  LOG("buffer created");
   return (GPRTBuffer) buffer;
 }
 
@@ -6519,7 +6566,6 @@ gprtSharedBufferCreate(GPRTContext _context, size_t size, size_t count, const vo
     buffer->flush();
     buffer->invalidate();
   }
-  LOG("buffer created");
   return (GPRTBuffer) buffer;
 }
 
@@ -6530,7 +6576,6 @@ gprtBufferDestroy(GPRTBuffer _buffer) {
   buffer->destroy();
   delete buffer;
   buffer = nullptr;
-  LOG("buffer destroyed");
 }
 
 GPRT_API void *
@@ -6606,7 +6651,7 @@ gprtTextureSaveImage(GPRTTexture _texture, const char *imageName) {
     texture->map();
 
   if (texture->format != VK_FORMAT_R8G8B8A8_SRGB) {
-    GPRT_RAISE("Error, only GPRT_FORMAT_R8G8B8A8_SRGB format currently supported!");
+    LOG_ERROR("Error, only GPRT_FORMAT_R8G8B8A8_SRGB format currently supported!");
   }
 
   const uint8_t *fb = (const uint8_t *) texture->mapped;
@@ -6615,14 +6660,6 @@ gprtTextureSaveImage(GPRTTexture _texture, const char *imageName) {
   // Return mapped to previous state
   if (!mapped)
     texture->unmap();
-}
-
-GPRT_API void
-gprtBuildPipeline(GPRTContext _context) {
-  LOG_API_CALL();
-  Context *context = (Context *) _context;
-  context->buildPipeline();
-  LOG("programs built...");
 }
 
 GPRT_API GPRTAccel
@@ -6660,6 +6697,12 @@ gprtInstanceAccelCreate(GPRTContext _context, size_t numAccels, GPRTAccel *array
       new InstanceAccel(context->physicalDevice, context->logicalDevice, context->graphicsCommandBuffer,
                         context->graphicsQueue, numAccels, arrayOfAccels);
   context->accels.push_back(accel);
+
+  // Creating an instance acceleration structure will introduce geom records into
+  // the SBT. Therefore, we need to rebuild the pipeline after this.
+
+  context->raytracingPipelineOutOfDate = true;
+
   return (GPRTAccel) accel;
 }
 
@@ -6679,7 +6722,6 @@ gprtInstanceAccelSetTransforms(GPRTAccel instanceAccel, GPRTBuffer _transforms, 
   InstanceAccel *accel = (InstanceAccel *) instanceAccel;
   Buffer *transforms = (Buffer *) _transforms;
   accel->setTransforms(transforms, stride, offset);
-  LOG("Setting instance accel transforms...");
 }
 
 GPRT_API void
@@ -6688,7 +6730,6 @@ gprtInstanceAccelSetVisibilityMasks(GPRTAccel instanceAccel, GPRTBuffer _masks) 
   InstanceAccel *accel = (InstanceAccel *) instanceAccel;
   Buffer *masks = (Buffer *) _masks;
   accel->setVisibilityMasks(masks);
-  LOG("Setting instance accel visibility masks...");
 }
 
 GPRT_API void
@@ -6701,7 +6742,6 @@ gprtInstanceAccelSetReferences(GPRTAccel instanceAccel,
   InstanceAccel *accel = (InstanceAccel *) instanceAccel;
   Buffer *references = (Buffer *) _references;
   accel->setReferences(references);
-  LOG("Setting instance accel references...");
 }
 
 GPRT_API void
@@ -6709,7 +6749,6 @@ gprtInstanceAccelSetNumGeometries(GPRTAccel instanceAccel, size_t numGeometries)
   LOG_API_CALL();
   InstanceAccel *accel = (InstanceAccel *) instanceAccel;
   accel->setNumGeometries(numGeometries);
-  LOG("Setting instance accel references...");
 }
 
 GPRT_API void
@@ -6719,7 +6758,6 @@ gprtAccelDestroy(GPRTAccel _accel) {
   accel->destroy();
   delete accel;
   accel = nullptr;
-  LOG("accel destroyed");
 }
 
 GPRT_API void
@@ -6744,6 +6782,7 @@ GPRT_API void
 gprtBuildShaderBindingTable(GPRTContext _context, GPRTBuildSBTFlags flags) {
   LOG_API_CALL();
   Context *context = (Context *) _context;
+  context->buildPipeline();
   context->buildSBT();
 }
 
@@ -6776,19 +6815,19 @@ gprtRayGenLaunch3D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x, int dim
   std::vector<VkDescriptorSet> descriptorSets = {context->samplerDescriptorSet, context->texture1DDescriptorSet,
                                                  context->texture2DDescriptorSet, context->texture3DDescriptorSet};
   vkCmdBindDescriptorSets(context->graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-                          context->pipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, NULL);
+                          context->raytracingPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, NULL);
 
   if (context->queryRequested) {
     vkCmdResetQueryPool(context->graphicsCommandBuffer, context->queryPool, 0, 2);
     vkCmdWriteTimestamp(context->graphicsCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, context->queryPool, 0);
   }
 
-  vkCmdBindPipeline(context->graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, context->pipeline);
+  vkCmdBindPipeline(context->graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, context->raytracingPipeline);
 
   struct PushConstants {
     uint64_t pad[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   } pushConstants;
-  vkCmdPushConstants(context->graphicsCommandBuffer, context->pipelineLayout,
+  vkCmdPushConstants(context->graphicsCommandBuffer, context->raytracingPipelineLayout,
                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
                          VK_SHADER_STAGE_INTERSECTION_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR |
                          VK_SHADER_STAGE_RAYGEN_BIT_KHR,
@@ -6858,7 +6897,7 @@ gprtRayGenLaunch3D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x, int dim
 
   err = vkEndCommandBuffer(context->graphicsCommandBuffer);
   if (err)
-    GPRT_RAISE("failed to end command buffer! : \n" + errorString(err));
+    LOG_ERROR("failed to end command buffer! : \n" + errorString(err));
 
   VkSubmitInfo submitInfo;
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -6873,11 +6912,11 @@ gprtRayGenLaunch3D(GPRTContext _context, GPRTRayGen _rayGen, int dims_x, int dim
 
   err = vkQueueSubmit(context->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
   if (err)
-    GPRT_RAISE("failed to submit to queue! : \n" + errorString(err));
+    LOG_ERROR("failed to submit to queue! : \n" + errorString(err));
 
   err = vkQueueWaitIdle(context->graphicsQueue);
   if (err)
-    GPRT_RAISE("failed to wait for queue idle! : \n" + errorString(err));
+    LOG_ERROR("failed to wait for queue idle! : \n" + errorString(err));
 }
 
 GPRT_API void
@@ -6951,7 +6990,7 @@ gprtComputeLaunch3D(GPRTContext _context, GPRTCompute _compute, int dims_x, int 
 
   err = vkEndCommandBuffer(context->graphicsCommandBuffer);
   if (err)
-    GPRT_RAISE("failed to end command buffer! : \n" + errorString(err));
+    LOG_ERROR("failed to end command buffer! : \n" + errorString(err));
 
   VkSubmitInfo submitInfo;
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -6966,11 +7005,11 @@ gprtComputeLaunch3D(GPRTContext _context, GPRTCompute _compute, int dims_x, int 
 
   err = vkQueueSubmit(context->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
   if (err)
-    GPRT_RAISE("failed to submit to queue! : \n" + errorString(err));
+    LOG_ERROR("failed to submit to queue! : \n" + errorString(err));
 
   err = vkQueueWaitIdle(context->graphicsQueue);
   if (err)
-    GPRT_RAISE("failed to wait for queue idle! : \n" + errorString(err));
+    LOG_ERROR("failed to wait for queue idle! : \n" + errorString(err));
 }
 
 GPRT_API void
@@ -6988,14 +7027,14 @@ gprtEndProfile(GPRTContext _context) {
   Context *context = (Context *) _context;
 
   if (context->queryRequested != true)
-    GPRT_RAISE("Requested profile data without calling gprtBeginProfile");
+    LOG_ERROR("Requested profile data without calling gprtBeginProfile");
   context->queryRequested = false;
 
   uint64_t buffer[2];
   VkResult result = vkGetQueryPoolResults(context->logicalDevice, context->queryPool, 0, 2, sizeof(uint64_t) * 2,
                                           buffer, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
   if (result != VK_SUCCESS)
-    GPRT_RAISE("Failed to receive query results!");
+    LOG_ERROR("Failed to receive query results!");
   uint64_t timeResults = buffer[1] - buffer[0];
   float time = float(timeResults) / context->deviceProperties.limits.timestampPeriod;
   return time;

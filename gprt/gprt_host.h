@@ -234,12 +234,12 @@ gprtGeomDestroy(GPRTGeomOf<T> geometry) {
   gprtGeomDestroy((GPRTGeom) geometry);
 }
 
-GPRT_API void *gprtGeomGetPointer(GPRTGeom geometry, int deviceID GPRT_IF_CPP(= 0));
+GPRT_API void *gprtGeomGetParameters(GPRTGeom geometry, int deviceID GPRT_IF_CPP(= 0));
 
 template <typename T>
 T *
-gprtGeomGetPointer(GPRTGeomOf<T> geometry, int deviceID GPRT_IF_CPP(= 0)) {
-  return (T *) gprtGeomGetPointer((GPRTGeom) geometry, deviceID);
+gprtGeomGetParameters(GPRTGeomOf<T> geometry, int deviceID GPRT_IF_CPP(= 0)) {
+  return (T *) gprtGeomGetParameters((GPRTGeom) geometry, deviceID);
 }
 
 // ==================================================================
@@ -291,11 +291,6 @@ gprtAABBsSetPositions(GPRTGeomOf<T1> aabbs, GPRTBufferOf<T2> positions, size_t c
   gprtAABBsSetPositions((GPRTGeom) aabbs, (GPRTBuffer) positions, count, stride, offset);
 }
 
-/* Builds the ray tracing pipeline over the raytracing programs.
-  This must be called after any acceleration structures are created.
-*/
-GPRT_API void gprtBuildPipeline(GPRTContext context);
-
 GPRT_API void gprtBuildShaderBindingTable(GPRTContext context, GPRTBuildSBTFlags flags GPRT_IF_CPP(= GPRT_SBT_ALL));
 
 /** Tells the GPRT to create a window when once the context is made.
@@ -312,6 +307,14 @@ GPRT_API void gprtRequestWindow(uint32_t initialWidth, uint32_t initialHeight, c
  * true.
  */
 GPRT_API bool gprtWindowShouldClose(GPRTContext context);
+
+/** If a window was requested, this function sets the title in the top bar of 
+ * the window to the given text.
+ *
+ * If a window was not requested (ie headless), this function does nothing
+ */
+GPRT_API void gprtSetWindowTitle(GPRTContext context, const char *title);
+
 
 /** If a window was requested, this function returns the position of the cursor
  * in screen coordinates relative to the upper left corner.
@@ -538,12 +541,12 @@ gprtComputeDestroy(GPRTComputeOf<T> compute) {
   gprtComputeDestroy((GPRTCompute) compute);
 }
 
-GPRT_API void *gprtComputeGetPointer(GPRTCompute compute, int deviceID GPRT_IF_CPP(= 0));
+GPRT_API void *gprtComputeGetParameters(GPRTCompute compute, int deviceID GPRT_IF_CPP(= 0));
 
 template <typename T>
 T *
-gprtComputeGetPointer(GPRTComputeOf<T> compute) {
-  return (T *) gprtComputeGetPointer((GPRTCompute) compute);
+gprtComputeGetParameters(GPRTComputeOf<T> compute) {
+  return (T *) gprtComputeGetParameters((GPRTCompute) compute);
 }
 
 GPRT_API GPRTRayGen gprtRayGenCreate(GPRTContext context, GPRTModule module, const char *programName,
@@ -563,12 +566,12 @@ gprtRayGenDestroy(GPRTRayGenOf<T> rayGen) {
   gprtRayGenDestroy((GPRTRayGen) rayGen);
 }
 
-GPRT_API void *gprtRayGenGetPointer(GPRTRayGen rayGen, int deviceID GPRT_IF_CPP(= 0));
+GPRT_API void *gprtRayGenGetParameters(GPRTRayGen rayGen, int deviceID GPRT_IF_CPP(= 0));
 
 template <typename T>
 T *
-gprtRayGenGetPointer(GPRTRayGenOf<T> rayGen, int deviceID GPRT_IF_CPP(= 0)) {
-  return (T *) gprtRayGenGetPointer((GPRTRayGen) rayGen, deviceID);
+gprtRayGenGetParameters(GPRTRayGenOf<T> rayGen, int deviceID GPRT_IF_CPP(= 0)) {
+  return (T *) gprtRayGenGetParameters((GPRTRayGen) rayGen, deviceID);
 }
 
 GPRT_API GPRTMiss gprtMissCreate(GPRTContext context, GPRTModule module, const char *programName, size_t recordSize);
@@ -596,12 +599,12 @@ gprtMissDestroy(GPRTMissOf<T> missProg) {
   gprtMissDestroy((GPRTMiss) missProg);
 }
 
-GPRT_API void *gprtMissGetPointer(GPRTMiss missProg, int deviceID GPRT_IF_CPP(= 0));
+GPRT_API void *gprtMissGetParameters(GPRTMiss missProg, int deviceID GPRT_IF_CPP(= 0));
 
 template <typename T>
 T *
-gprtMissGetPointer(GPRTMissOf<T> missProg, int deviceID GPRT_IF_CPP(= 0)) {
-  return (T *) gprtMissGetPointer((GPRTMiss) missProg, deviceID);
+gprtMissGetParameters(GPRTMissOf<T> missProg, int deviceID GPRT_IF_CPP(= 0)) {
+  return (T *) gprtMissGetParameters((GPRTMiss) missProg, deviceID);
 }
 
 // ------------------------------------------------------------------

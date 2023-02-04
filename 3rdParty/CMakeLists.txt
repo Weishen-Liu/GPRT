@@ -103,7 +103,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tiny_obj_loader EXCLUDE_FROM_ALL)
 
 # Find GLFW
-if(GPRT_BUILD_SAMPLES)
+# if(GPRT_BUILD_SAMPLES)
   find_package(glfw3 QUIET)
   set(OpenGL_GL_PREFERENCE "LEGACY")
   #find_package(OpenGL QUIET)
@@ -114,7 +114,7 @@ if(GPRT_BUILD_SAMPLES)
       add_subdirectory(glfw)
     endif()
   endif()
-endif()
+# endif()
 
 # Find mesh generator
 if (GPRT_BUILD_SAMPLES)
