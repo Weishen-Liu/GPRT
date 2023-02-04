@@ -19,11 +19,6 @@ void ConfigureImgui::initObj()
         Obj newObj;
         newObj.name = INITIAL_OBJ[i]->name;
         newObj.path = INITIAL_OBJ[i]->path;
-        Obj::Instance instance;
-        instance.transform = float3(0.0f, 0.0f, 0.0f);
-        instance.name = newObj.name + std::to_string(newObj.instances.size());
-        newObj.instances.push_back(instance);
-        // newObj.transform = float3(0.0f, 0.0f, 0.0f);
         newObj.material.type = ALL_MATERIALS[0].c_str();
         newObj.material.lambertian.albedo = lambertian_color;
         newObj.material.metal.albedo = metal_color;
@@ -45,16 +40,21 @@ void ConfigureImgui::initObj()
 void ConfigureImgui::initLight()
 {
     AmbientLight sampleAmbientLight;
-    sampleAmbientLight.name = "Ambient Light Sample #1";
+    std::string lightName;
+    lightName = "Ambient Light " + std::to_string(ambientLightUniqueName);
+    sampleAmbientLight.name = lightName.c_str();
+    ambientLightUniqueName++;
     sampleAmbientLight.intensity = float3(1.f, 1.f, 1.f);
     sampleAmbientLight.choosed = false;
     LIST_OF_AMBIENT_LIGHTS.push_back(sampleAmbientLight);
 
     DirectionalLight sampleDirectionalLight;
-    sampleDirectionalLight.name = "Directional Light Sample #1";
+    lightName = "Directional Light " + std::to_string(directionalLightUniqueName);
+    sampleDirectionalLight.name = lightName.c_str();
+    directionalLightUniqueName++;
     sampleDirectionalLight.intensity = float3(1.f, 1.f, 1.f);
     sampleDirectionalLight.direction = float3(0.f, -5.f, 0.f);
-    sampleDirectionalLight.choosed = true;
+    sampleDirectionalLight.choosed = false;
     LIST_OF_DIRECTIONAL_LIGHTS.push_back(sampleDirectionalLight);
 
     for (auto each_light: LIST_OF_AMBIENT_LIGHTS) {
@@ -69,12 +69,34 @@ void ConfigureImgui::initLight()
     }
 }
 
+void ConfigureImgui::createDefaultInstance(Obj& obj)
+{
+    for (int i = 0; i < obj.generateInstance; i++)
+    {
+        Obj::Instance instance;
+        instance.transform = obj.defaultTransform;
+        instance.name = obj.name + " " +std::to_string(obj.instanceUniqueName);
+        obj.instanceUniqueName++;
+        obj.instances.push_back(instance);
+    }
+    updateObjSelection = true;
+}
+
 void ConfigureImgui::addObjInstance(Obj& obj)
 {
     if (obj.addObjInstanceWindow)
     {
         const char* item = obj.name.c_str();
-        ImGui::Begin("Add Instance", &obj.addObjInstanceWindow);
+        std::string windowName = "Instances for " + obj.name;
+        ImGui::Begin(windowName.c_str(), &obj.addObjInstanceWindow);
+        ImGui::Text("Generate"); ImGui::SameLine();
+        std::string generateInstanceName = " Instance for " + obj.name;
+        ImGui::SliderInt(generateInstanceName.c_str(), &obj.generateInstance, 1, 3);
+        if (ImGui::Button("Create Instances"))
+        {
+            createDefaultInstance(obj);
+        }
+        ImGui::Text("");
         ImGui::Text("Selected %d Instances under Obj '%s'", obj.SELECTED_OBJ_INSTANCE, item);
         for (int eachInstance = 0; eachInstance < obj.instances.size(); eachInstance++)
         {
@@ -277,10 +299,31 @@ void ConfigureImgui::addLight()
     if (addNewLight)
     {
         ImGui::Begin("Add Light", &addNewLight);
+        if (ImGui::Button("Add New Ambient Light"))
+        {
+            AmbientLight sampleAmbientLight;
+            sampleAmbientLight.name = "Ambient Light " + std::to_string(ambientLightUniqueName);
+            ambientLightUniqueName++;
+            sampleAmbientLight.intensity = float3(1.f, 1.f, 1.f);
+            sampleAmbientLight.choosed = false;
+            LIST_OF_AMBIENT_LIGHTS.push_back(sampleAmbientLight);
+        }
+
+        if (ImGui::Button("Add New Directional Light"))
+        {
+            DirectionalLight sampleDirectionalLight;
+            sampleDirectionalLight.name = "Directional Light " + std::to_string(directionalLightUniqueName);
+            directionalLightUniqueName++;
+            sampleDirectionalLight.intensity = float3(1.f, 1.f, 1.f);
+            sampleDirectionalLight.direction = float3(0.f, -5.f, 0.f);
+            sampleDirectionalLight.choosed = false;
+            LIST_OF_DIRECTIONAL_LIGHTS.push_back(sampleDirectionalLight);
+        }
+
         ImGui::Text("Selected %d Lights", SELECTED_LIGHTS);
         for (int i = 0; i < LIST_OF_AMBIENT_LIGHTS.size(); i++)
         {
-            const char* selectedLight = LIST_OF_AMBIENT_LIGHTS[i].name;
+            const char* selectedLight = LIST_OF_AMBIENT_LIGHTS[i].name.c_str();
             if (ImGui::Checkbox(selectedLight, &LIST_OF_AMBIENT_LIGHTS[i].choosed))
             {
                 updateLights = true;
@@ -299,7 +342,7 @@ void ConfigureImgui::addLight()
         }
         for (int i = 0; i < LIST_OF_DIRECTIONAL_LIGHTS.size(); i++)
         {
-            const char* selectedLight = LIST_OF_DIRECTIONAL_LIGHTS[i].name;
+            const char* selectedLight = LIST_OF_DIRECTIONAL_LIGHTS[i].name.c_str();
             if (ImGui::Checkbox(selectedLight, &LIST_OF_DIRECTIONAL_LIGHTS[i].choosed))
             {
                 updateLights = true;
@@ -337,7 +380,7 @@ void ConfigureImgui::renderLightCP()
         {
             for (int n = 0; n < LIST_OF_AMBIENT_LIGHTS.size(); n++)
             {
-                const char* light = LIST_OF_AMBIENT_LIGHTS[n].name;
+                const char* light = LIST_OF_AMBIENT_LIGHTS[n].name.c_str();
                 bool is_selected = (current_light.name == light); // You can store your selection however you want, outside or inside your objects
                 if (LIST_OF_AMBIENT_LIGHTS[n].choosed == false)
                 {
@@ -356,7 +399,7 @@ void ConfigureImgui::renderLightCP()
             }
             for (int n = 0; n < LIST_OF_DIRECTIONAL_LIGHTS.size(); n++)
             {
-                const char* light = LIST_OF_DIRECTIONAL_LIGHTS[n].name;
+                const char* light = LIST_OF_DIRECTIONAL_LIGHTS[n].name.c_str();
                 bool is_selected = (current_light.name == light); // You can store your selection however you want, outside or inside your objects
                 if (LIST_OF_DIRECTIONAL_LIGHTS[n].choosed == false)
                 {

@@ -659,6 +659,8 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
     // dielectric.ref_idx = gprt::load<float>(record.dielectric, primID);
     payload.scatterResult = scatter(dielectric, targetPoint, normal, payload);
   }
+  payload.scatterResult.scatteredOrigin = WorldRayOrigin() + WorldRayDirection() * tHit;
+  payload.scatterResult.scatteredDirection = mul(payload.scatterResult.scatteredDirection, (float3x3)ObjectToWorld4x3());
 }
 
 GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
@@ -667,8 +669,8 @@ GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
   const float t = 0.5f * (rayDir.y + 1.0f);
   const float3 c = (1.0f - t) * float3(1.0f, 1.0f, 1.0f) + t * float3(0.5f, 0.7f, 1.0f);
   payload.color = c;
-  // payload.color = float3(1.f, 1.f, 1.f);
-  payload.color = float3(0.f, 0.f, 0.f);
+  payload.color = float3(1.f, 1.f, 1.f);
+  // payload.color = float3(0.f, 0.f, 0.f);
 
   ScatterResult result;
   result.scatterEvent = 2;
