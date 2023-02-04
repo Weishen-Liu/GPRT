@@ -494,12 +494,8 @@ void Viewer::run()
         } else if (vulkanResources.configureImgui.updateLights) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            // vulkanResources.refreshLights();
-            vulkanResources.resetVulkanGeometryResources(deviceCode);
+            vulkanResources.refreshLights();
             vulkanResources.configureImgui.updateLights = false;
         }
-        // else {
-        //     std::cout<<"No Changes"<<std::endl;
-        // }
     }
 }
