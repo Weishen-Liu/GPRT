@@ -356,6 +356,7 @@ void VulkanResources::destoryVulkanResources() {
         gprtBufferDestroy(eachGeo.metalFuzzBuffer);
         gprtBufferDestroy(eachGeo.lambertianBuffer);
         gprtBufferDestroy(eachGeo.dielectricBuffer);
+        gprtAccelDestroy(eachGeo.trianglesBLAS);
         gprtGeomDestroy(eachGeo.trianglesGeom);
     }
     gprtBufferDestroy(frameBuffer);
@@ -368,9 +369,6 @@ void VulkanResources::destoryVulkanResources() {
 
     gprtRayGenDestroy(rayGen);
     gprtMissDestroy(miss);
-    for (auto eachBLAS: listOfTrianglesBLAS){
-        gprtAccelDestroy(eachBLAS);
-    }
     gprtAccelDestroy(trianglesTLAS);
     gprtGeomTypeDestroy(trianglesGeomType);
     gprtModuleDestroy(module);

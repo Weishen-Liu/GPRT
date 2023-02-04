@@ -39,6 +39,9 @@ struct Obj {
     const char* current_instance = NULL;
     const char* current_instance_material = NULL;
     int current_instance_index = -1;
+    int instanceUniqueName = 0;
+    float3 defaultTransform = float3(0.f, 0.f, 0.f);
+    int generateInstance = 1;
 };
 
 struct LoadInObj {
@@ -54,7 +57,7 @@ struct ConfigureImgui {
         const char* name = NULL;
         const char* type = NULL;
         int index = -1;
-    }current_light;
+    } current_light;
 
     std::vector<LoadInObj*> INITIAL_OBJ = {
         new LoadInObj("Viking Room", "/media/storage0/weishen/GPRT-1/samples/new_example/models/viking_room.obj"),
@@ -83,6 +86,8 @@ struct ConfigureImgui {
         "Directional"
     };
 
+    int ambientLightUniqueName = 0;
+    int directionalLightUniqueName = 0;
     std::vector<AmbientLight> LIST_OF_AMBIENT_LIGHTS;
     std::vector<DirectionalLight> LIST_OF_DIRECTIONAL_LIGHTS;
     int SELECTED_LIGHTS = 0;
@@ -106,6 +111,7 @@ struct ConfigureImgui {
     void renderLightCP();
 
     void initObj();
+    void createDefaultInstance(Obj& obj);
     void objInstances();
     void addObjInstance(Obj& obj);
     void showSelectedObjCountWarning();
