@@ -35,3 +35,4 @@ add_subdirectory(s11-imgui)
 add_subdirectory(s12-swBVH)
 
 add_subdirectory(new_example)
+add_subdirectory(new_example_volume)
