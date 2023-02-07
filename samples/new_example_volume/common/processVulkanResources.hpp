@@ -49,9 +49,14 @@ struct VulkanResources {
         std::vector<float> list_of_dielectrics = {};
     };
     std::vector<Geometry> listOfGeometry;
-    Geometry trashGeometry;
+    Geometry trashGeometry; // Used for when no Obj wants to be rendered
 
     // Volume
+    struct GeometryVolume{
+
+    };
+
+    
     GPRTGeomTypeOf<AABBGeomData> aabbGeomType;
     GPRTBufferOf<float3> aabbPositionsBuffer;
     GPRTGeomOf<AABBGeomData> aabbGeom;
@@ -99,7 +104,8 @@ struct VulkanResources {
     void updateVulkanResources();
     void updateLights();
     void buildSBT();
-    void createGeometry(int each_path);
+    void createGeometry(Obj &obj);
+    void createVolume(Volume &volume);
     void createAccel();
     void createMiss();
     void createRayGen();
@@ -136,6 +142,10 @@ struct VulkanResources {
         std::vector<float3>& list_of_ambient_lights_intensity,
         std::vector<float3>& list_of_directional_lights_intensity,
         std::vector<float3>& list_of_directional_lights_dir
+    );
+
+    void loadVolume(
+        Volume &volume
     );
 };
 

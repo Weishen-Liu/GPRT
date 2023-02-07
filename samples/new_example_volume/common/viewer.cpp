@@ -324,6 +324,7 @@ void Viewer::init(GPRTProgram new_example_deviceCode)
                             lookUp,
                             cosFovy);
     vulkanResources.configureImgui.initObj();
+    vulkanResources.configureImgui.initVolume();
     // vulkanResources.configureImgui.initLight();
     deviceCode = new_example_deviceCode;
     vulkanResources.initialVulkanResources(deviceCode);

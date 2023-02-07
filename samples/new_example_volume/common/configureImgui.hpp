@@ -8,6 +8,7 @@
 #include "./math/random.h"
 #include "lights.hpp"
 #include "material.hpp"
+#include "array.hpp"
 
 #include <cstring>
 #include <string>
@@ -20,14 +21,13 @@ struct Material
   Dielectric dielectric;
 };
 
-struct Obj {
-    
-    struct Instance {
-        std::string name;
-        bool choosed = false;
-        float3 transform;
-    };
+struct Instance {
+    std::string name;
+    bool choosed = false;
+    float3 transform;
+};
 
+struct Obj {
     std::string name;
     std::string path;
     Material material;
@@ -49,6 +49,33 @@ struct LoadInObj {
     std::string path;
 
     LoadInObj(std::string inputName, std::string inputPath) : name(inputName), path(inputPath) {}
+};
+
+struct TransferFunction {
+  array_1d_float4_t color;
+  array_1d_scalar_t opacity;
+  float2 value_range;
+};
+
+struct Volume {
+    std::string name;
+    std::string path;
+    float3 grid_origin  = float3(0.f, 0.f, 0.f);
+    float3 grid_spacing = float3(1.f, 1.f, 1.f);
+    array_3d_scalar_t data;
+    TransferFunction transferFunction;
+
+    std::vector<Instance> instances;
+    int SELECTED_VOLUME_INSTANCE = 0;
+    int instanceUniqueName = 0;
+    float3 defaultTransform = float3(0.f, 0.f, 0.f);
+};
+
+struct LoadInVolume {
+    std::string name;
+    std::string path;
+
+    LoadInVolume(std::string inputName, std::string inputPath) : name(inputName), path(inputPath) {}
 };
 
 struct ConfigureImgui {
@@ -92,6 +119,11 @@ struct ConfigureImgui {
 
     // The extents of our bounding box
     float3 aabbPositions[2] = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
+    std::vector<LoadInVolume*> INITIAL_VOLUME = {
+        new LoadInVolume("Mechanic Hand", "/media/storage0/weishen/GPRT-1/samples/new_example_volume/volumes/scene_mechhand.json")
+    };
+    std::vector<Volume> LIST_OF_VOLUMES;
+    int SELECTED_VOLUMES = 0;
 
     const int2 fbSize = {800, 600};
     uint64_t accId = 0;
@@ -123,6 +155,8 @@ struct ConfigureImgui {
     void initLight();
     void addLight();
     void updateLight();
+
+    void initVolume();
 
     void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger);
 };

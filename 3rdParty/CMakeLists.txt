@@ -105,6 +105,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
 # Find Tiny Obj
 add_subdirectory(tinyobj)
 
+# Find JSON file loader
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/json EXCLUDE_FROM_ALL)
+
 # Find GLFW
 # if(GPRT_BUILD_SAMPLES)
   if(NOT GPRT_USE_INCLUDED_GLFW)
