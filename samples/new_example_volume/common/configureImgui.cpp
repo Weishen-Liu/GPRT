@@ -69,11 +69,26 @@ void ConfigureImgui::initLight()
     }
 }
 
+void ConfigureImgui::initVolume()
+{
+    std::cout<<"Init Volume"<<std::endl;
+    for (int i = 0; i < INITIAL_VOLUME.size(); i++)
+    {
+        owl::common::LCG<4> random;
+        random.init(0, 1);
+
+        Volume newVolume;
+        newVolume.name = INITIAL_VOLUME[i]->name;
+        newVolume.path = INITIAL_VOLUME[i]->path;
+        LIST_OF_VOLUMES.push_back(newVolume);
+    }
+}
+
 void ConfigureImgui::createDefaultInstance(Obj& obj)
 {
     for (int i = 0; i < obj.generateInstance; i++)
     {
-        Obj::Instance instance;
+        Instance instance;
         instance.transform = obj.defaultTransform;
         instance.name = obj.name + " " +std::to_string(obj.instanceUniqueName);
         obj.instanceUniqueName++;

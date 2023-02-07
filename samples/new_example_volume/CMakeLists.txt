@@ -29,7 +29,7 @@ embed_devicecode(
     ${CMAKE_CURRENT_SOURCE_DIR}/deviceCode.hlsl
 )
 
-add_executable(new_example_volume hostCode.cpp common/viewer.cpp common/configureImgui.cpp common/processVulkanResources.cpp)
+add_executable(new_example_volume hostCode.cpp common/viewer.cpp common/configureImgui.cpp common/processVulkanResources.cpp common/jsonLoader.cpp)
 target_include_directories(new_example_volume PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_include_directories(new_example_volume PUBLIC ${CMAKE_CURRENT_LIST_DIR}/..)
 target_link_libraries(new_example_volume
@@ -41,4 +41,7 @@ target_link_libraries(new_example_volume
     stb_image
     imgui-1
     ${OPENGL_gl_LIBRARY}
+    stdc++fs
+    tfnmodule
+    gdt
 )

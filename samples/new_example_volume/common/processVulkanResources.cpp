@@ -7,7 +7,7 @@
 #include <unordered_map>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
-
+#include "jsonLoader.hpp"
 
 struct Vertex
 {
@@ -60,7 +60,7 @@ namespace std {
     };
 }
 
-void VulkanResources::createGeometry(int each_path) {
+void VulkanResources::createGeometry(Obj &obj) {
     // ------------------------------------------------------------------
     // triangle mesh
     // ------------------------------------------------------------------
@@ -68,7 +68,7 @@ void VulkanResources::createGeometry(int each_path) {
     geometry.trianglesGeom = gprtGeomCreate<TrianglesGeomData>(context, trianglesGeomType);
 
     loadModel(
-        configureImgui.LIST_OF_OBJS[each_path],
+        obj,
         geometry.list_of_vertices,
         geometry.list_of_indices,
         geometry.list_of_colors,
@@ -95,6 +95,10 @@ void VulkanResources::createGeometry(int each_path) {
     geometry.trianglesBLAS = gprtTrianglesAccelCreate(context, 1, &geometry.trianglesGeom);
     gprtAccelBuild(context, geometry.trianglesBLAS);
     listOfGeometry.push_back(geometry);
+}
+
+void VulkanResources::createVolume(Volume &volume) {
+    loadVolume(volume);
 }
 
 void VulkanResources::updateGeometryMaterial(Geometry &geometry, Obj &obj)
@@ -213,9 +217,9 @@ void VulkanResources::updateVulkanResources() {
     // set up all the *GEOMETRY* graph we want to render
     // ##################################################################
     std::cout<<"Geo"<<std::endl;
-    for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
+    for (auto each_obj : configureImgui.LIST_OF_OBJS)
     {
-        createGeometry(each_path);
+        createGeometry(each_obj);
     }
 
     // Create Trash Geometry for 0 TLAS Buffer
@@ -227,6 +231,12 @@ void VulkanResources::updateVulkanResources() {
     for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
     {
         updateGeometryMaterial(listOfGeometry[each_path], configureImgui.LIST_OF_OBJS[each_path]);
+    }
+
+    std::cout<<"Volume"<<std::endl;
+    for (auto each_volume : configureImgui.LIST_OF_VOLUMES)
+    {
+        createVolume(each_volume);
     }
 
     // ------------------------------------------------------------------
@@ -393,6 +403,10 @@ void VulkanResources::destoryVulkanResources() {
     gprtMissDestroy(miss);
     gprtAccelDestroy(trianglesTLAS);
     gprtGeomTypeDestroy(trianglesGeomType);
+    gprtAccelDestroy(aabbBLAS);
+    gprtAccelDestroy(aabbTLAS);
+    gprtGeomTypeDestroy(aabbGeomType);
+    gprtGeomDestroy(aabbGeom);
     gprtModuleDestroy(module);
     gprtContextDestroy(context);
 }
@@ -543,3 +557,7 @@ void VulkanResources::loadLights(
     }
 }
 
+void VulkanResources::loadVolume(Volume &volume)
+{
+    load_volume_data_from_file(volume);
+}
