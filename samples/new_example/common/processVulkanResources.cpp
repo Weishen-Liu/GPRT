@@ -266,7 +266,7 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
 void VulkanResources::createAccel() {
     for (int i = 0; i < configureImgui.LIST_OF_OBJS.size(); i++)
     {
-        for (auto eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
+        for (auto &eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
         {
             if (eachInstance.choosed)
             {
@@ -345,7 +345,7 @@ void VulkanResources::destoryVulkanResources() {
         gprtBufferDestroy(directionalLightDirBuffer);
     }
     
-    for (auto eachGeo: listOfGeometry)
+    for (auto &eachGeo: listOfGeometry)
     {
         gprtBufferDestroy(eachGeo.vertexBuffer);
         gprtBufferDestroy(eachGeo.normalBuffer);

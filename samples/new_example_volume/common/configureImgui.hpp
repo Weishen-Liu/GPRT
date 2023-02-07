@@ -44,13 +44,6 @@ struct Obj {
     int generateInstance = 1;
 };
 
-struct LoadInObj {
-    std::string name;
-    std::string path;
-
-    LoadInObj(std::string inputName, std::string inputPath) : name(inputName), path(inputPath) {}
-};
-
 struct TransferFunction {
   array_1d_float4_t color;
   array_1d_scalar_t opacity;
@@ -69,6 +62,13 @@ struct Volume {
     int SELECTED_VOLUME_INSTANCE = 0;
     int instanceUniqueName = 0;
     float3 defaultTransform = float3(0.f, 0.f, 0.f);
+};
+
+struct LoadInObj {
+    std::string name;
+    std::string path;
+
+    LoadInObj(std::string inputName, std::string inputPath) : name(inputName), path(inputPath) {}
 };
 
 struct LoadInVolume {
