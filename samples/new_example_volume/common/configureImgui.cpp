@@ -28,8 +28,8 @@ void ConfigureImgui::initObj()
         LIST_OF_OBJS.push_back(newObj);
     }
 
-    for (auto each_obj: LIST_OF_OBJS) {
-        for (auto each_instance: each_obj.instances) {
+    for (auto &each_obj: LIST_OF_OBJS) {
+        for (auto &each_instance: each_obj.instances) {
             if (each_instance.choosed) {
                 each_obj.SELECTED_OBJ_INSTANCE++;
             }
@@ -57,12 +57,12 @@ void ConfigureImgui::initLight()
     sampleDirectionalLight.choosed = false;
     LIST_OF_DIRECTIONAL_LIGHTS.push_back(sampleDirectionalLight);
 
-    for (auto each_light: LIST_OF_AMBIENT_LIGHTS) {
+    for (auto &each_light: LIST_OF_AMBIENT_LIGHTS) {
         if (each_light.choosed) {
             SELECTED_LIGHTS++;
         }
     }
-    for (auto each_light: LIST_OF_DIRECTIONAL_LIGHTS) {
+    for (auto &each_light: LIST_OF_DIRECTIONAL_LIGHTS) {
         if (each_light.choosed) {
             SELECTED_LIGHTS++;
         }

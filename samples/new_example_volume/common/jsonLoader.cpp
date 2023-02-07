@@ -248,9 +248,6 @@ void load_volume_data_from_file(Volume &volume)
     extract_root_and_workdir(file_path, root, workdir);
 
     if (file_type == "json") {
-      Instance instance;
-      instance.transform = volume.defaultTransform;
-
       for (auto& ds : root[DATA_SOURCE]) {
         create_scene_volume(ds, workdir, volume);
 
@@ -264,8 +261,6 @@ void load_volume_data_from_file(Volume &volume)
                       << std::endl;
           }
         }
-
-        volume.instances.push_back(instance);
       }
     }
 }

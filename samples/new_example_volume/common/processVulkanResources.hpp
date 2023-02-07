@@ -53,13 +53,12 @@ struct VulkanResources {
 
     // Volume
     struct GeometryVolume{
+        GPRTGeomOf<AABBGeomData> aabbGeom;
+        GPRTAccel aabbBLAS;
 
+        GPRTBufferOf<float3> aabbPositionsBuffer;
     };
-
-    
-    GPRTGeomTypeOf<AABBGeomData> aabbGeomType;
-    GPRTBufferOf<float3> aabbPositionsBuffer;
-    GPRTGeomOf<AABBGeomData> aabbGeom;
+    std::vector<GeometryVolume> listOfGeometryVolume;
 
     // General
     GPRTContext context;
@@ -70,7 +69,7 @@ struct VulkanResources {
     GPRTBufferOf<float4x4> transformBuffer;
     std::vector<GPRTAccel> listOfTrianglesBLAS;
     GPRTAccel trianglesTLAS;
-    GPRTAccel aabbBLAS;
+    std::vector<GPRTAccel> listOfVolumesBLAS;
     GPRTAccel aabbTLAS;
 
     // DataType
@@ -79,6 +78,7 @@ struct VulkanResources {
 
     // Generate
     GPRTGeomTypeOf<TrianglesGeomData> trianglesGeomType;
+    GPRTGeomTypeOf<AABBGeomData> aabbGeomType;
     GPRTMissOf<MissProgData> miss;
     GPRTRayGenOf<RayGenData> rayGen;
 
@@ -107,6 +107,7 @@ struct VulkanResources {
     void createGeometry(Obj &obj);
     void createVolume(Volume &volume);
     void createAccel();
+    void createVolumeAccel();
     void createMiss();
     void createRayGen();
     void destoryVulkanResources();

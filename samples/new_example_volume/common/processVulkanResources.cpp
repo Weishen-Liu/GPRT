@@ -99,6 +99,19 @@ void VulkanResources::createGeometry(Obj &obj) {
 
 void VulkanResources::createVolume(Volume &volume) {
     loadVolume(volume);
+
+    GeometryVolume newGeometryVolume;
+    // Create our AABB geometry. Every AABB is defined using two float3's. The
+    // first float3 defines the bottom lower left near corner, and the second
+    // float3 defines the upper far right corner.
+    newGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, configureImgui.aabbPositions);
+    newGeometryVolume.aabbGeom = gprtGeomCreate<AABBGeomData>(context, aabbGeomType);
+    gprtAABBsSetPositions(newGeometryVolume.aabbGeom, newGeometryVolume.aabbPositionsBuffer, 1 /* just one aabb */);
+
+    // Note, we must create an "AABB" accel rather than a triangles accel.
+    newGeometryVolume.aabbBLAS = gprtAABBAccelCreate(context, 1, &newGeometryVolume.aabbGeom);
+    gprtAccelBuild(context, newGeometryVolume.aabbBLAS);
+    listOfGeometryVolume.push_back(newGeometryVolume);
 }
 
 void VulkanResources::updateGeometryMaterial(Geometry &geometry, Obj &obj)
@@ -217,7 +230,7 @@ void VulkanResources::updateVulkanResources() {
     // set up all the *GEOMETRY* graph we want to render
     // ##################################################################
     std::cout<<"Geo"<<std::endl;
-    for (auto each_obj : configureImgui.LIST_OF_OBJS)
+    for (auto &each_obj : configureImgui.LIST_OF_OBJS)
     {
         createGeometry(each_obj);
     }
@@ -234,9 +247,18 @@ void VulkanResources::updateVulkanResources() {
     }
 
     std::cout<<"Volume"<<std::endl;
-    for (auto each_volume : configureImgui.LIST_OF_VOLUMES)
+    for (auto &each_volume : configureImgui.LIST_OF_VOLUMES)
     {
         createVolume(each_volume);
+
+        if (each_volume.instances.size() == 0) {
+            Instance instance;
+            instance.name = each_volume.name + " " +std::to_string(each_volume.instanceUniqueName);
+            each_volume.instanceUniqueName++;
+            instance.transform = each_volume.defaultTransform;
+            instance.choosed = true;
+            each_volume.instances.push_back(instance);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -244,20 +266,7 @@ void VulkanResources::updateVulkanResources() {
     // ------------------------------------------------------------------
     std::cout<<"Accel"<<std::endl;
     createAccel();
-
-    // Create our AABB geometry. Every AABB is defined using two float3's. The
-    // first float3 defines the bottom lower left near corner, and the second
-    // float3 defines the upper far right corner.
-    aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, configureImgui.aabbPositions);
-    aabbGeom = gprtGeomCreate<AABBGeomData>(context, aabbGeomType);
-    gprtAABBsSetPositions(aabbGeom, aabbPositionsBuffer, 1 /* just one aabb */);
-    // Note, we must create an "AABB" accel rather than a triangles accel.
-    aabbBLAS = gprtAABBAccelCreate(context, 1, &aabbGeom);
-    gprtAccelBuild(context, aabbBLAS);
-
-    // triangle and AABB accels can be combined in a top level tree
-    aabbTLAS = gprtInstanceAccelCreate(context, 1, &aabbBLAS);
-    gprtAccelBuild(context, aabbTLAS);
+    createVolumeAccel();
 
     // ##################################################################
     // set miss and raygen program required for SBT
@@ -297,7 +306,7 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
 void VulkanResources::createAccel() {
     for (int i = 0; i < configureImgui.LIST_OF_OBJS.size(); i++)
     {
-        for (auto eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
+        for (auto &eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
         {
             if (eachInstance.choosed)
             {
@@ -317,6 +326,39 @@ void VulkanResources::createAccel() {
     }
 
     gprtAccelBuild(context, trianglesTLAS);
+}
+
+void VulkanResources::createVolumeAccel() {
+    std::cout<< "LIST_OF_VOLUMES.size(): " << configureImgui.LIST_OF_VOLUMES.size() << std::endl;
+    for (int i = 0; i < configureImgui.LIST_OF_VOLUMES.size(); i++)
+    {
+        std::cout<< "instances.size(): " << configureImgui.LIST_OF_VOLUMES[i].instances.size() << std::endl;
+        for (auto &eachInstance: configureImgui.LIST_OF_VOLUMES[i].instances)
+        {
+            if (eachInstance.choosed)
+            {
+                listOfVolumesBLAS.push_back(listOfGeometryVolume[i].aabbBLAS);
+                transforms.push_back(transpose(translation_matrix(eachInstance.transform)));
+            }
+        }
+    }
+
+    // if (transforms.size() > 0) {
+    //     aabbTLAS = gprtInstanceAccelCreate(context, listOfVolumesBLAS.size(), listOfVolumesBLAS.data());
+
+    //     transformBuffer = gprtDeviceBufferCreate<float4x4>(context, transforms.size(), transforms.data());
+    //     gprtInstanceAccelSet4x4Transforms(trianglesTLAS, transformBuffer);
+    //     // triangle and AABB accels can be combined in a top level tree
+    //     gprtAccelBuild(context, aabbTLAS);
+    // } else {
+    //     trianglesTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometry.trianglesBLAS);
+    // }
+
+    aabbTLAS = gprtInstanceAccelCreate(context, listOfVolumesBLAS.size(), listOfVolumesBLAS.data());
+    transformBuffer = gprtDeviceBufferCreate<float4x4>(context, transforms.size(), transforms.data());
+    gprtInstanceAccelSet4x4Transforms(aabbTLAS, transformBuffer);
+    // triangle and AABB accels can be combined in a top level tree
+    gprtAccelBuild(context, aabbTLAS);
 }
 
 void VulkanResources::createMiss() {
@@ -377,7 +419,7 @@ void VulkanResources::destoryVulkanResources() {
         gprtBufferDestroy(directionalLightDirBuffer);
     }
     
-    for (auto eachGeo: listOfGeometry)
+    for (auto &eachGeo: listOfGeometry)
     {
         gprtBufferDestroy(eachGeo.vertexBuffer);
         gprtBufferDestroy(eachGeo.normalBuffer);
@@ -398,15 +440,18 @@ void VulkanResources::destoryVulkanResources() {
     {
         gprtBufferDestroy(transformBuffer);
     }
-    gprtBufferDestroy(aabbPositionsBuffer);
+    for (auto &eachGeo: listOfGeometryVolume) 
+    {
+        gprtBufferDestroy(eachGeo.aabbPositionsBuffer);
+        gprtAccelDestroy(eachGeo.aabbBLAS);
+        gprtGeomDestroy(eachGeo.aabbGeom);
+    }
     gprtRayGenDestroy(rayGen);
     gprtMissDestroy(miss);
     gprtAccelDestroy(trianglesTLAS);
     gprtGeomTypeDestroy(trianglesGeomType);
-    gprtAccelDestroy(aabbBLAS);
     gprtAccelDestroy(aabbTLAS);
     gprtGeomTypeDestroy(aabbGeomType);
-    gprtGeomDestroy(aabbGeom);
     gprtModuleDestroy(module);
     gprtContextDestroy(context);
 }
