@@ -484,23 +484,38 @@ void Viewer::run()
         glfwSwapBuffers(handle);
         glfwPollEvents();
 
-        // Add Obj
+        // Refresh
         if (vulkanResources.configureImgui.updateObjSelection) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshObj();
             vulkanResources.configureImgui.updateObjSelection = false;
-        } else if (vulkanResources.configureImgui.updateObjTransform) {
+        }
+        else if (vulkanResources.configureImgui.updateObjTransform) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshObj();
             vulkanResources.configureImgui.updateObjTransform = false;
-        } else if (vulkanResources.configureImgui.updateObjMaterials) {
+        }
+        else if (vulkanResources.configureImgui.updateObjMaterials) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshObjMaterial();
             vulkanResources.configureImgui.updateObjMaterials = false;
-        } else if (vulkanResources.configureImgui.updateLights) {
+        }
+        else if (vulkanResources.configureImgui.updateVolumeSelection) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshVolume();
+            vulkanResources.configureImgui.updateVolumeSelection = false;
+        }
+        else if (vulkanResources.configureImgui.updateVolumeTransform) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshVolume();
+            vulkanResources.configureImgui.updateVolumeTransform = false;
+        }
+        else if (vulkanResources.configureImgui.updateLights) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshLights();

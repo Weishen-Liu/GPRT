@@ -33,9 +33,9 @@ struct Obj {
     Material material;
 
     bool openInstanceWindow = false;
-    bool addObjInstanceWindow = false;
+    bool addInstanceWindow = false;
     std::vector<Instance> instances;
-    int SELECTED_OBJ_INSTANCE = 0;
+    int SELECTED_INSTANCE = 0;
     const char* current_instance = NULL;
     const char* current_instance_material = NULL;
     int current_instance_index = -1;
@@ -68,12 +68,17 @@ struct Volume {
     float3 grid_spacing = float3(1.f, 1.f, 1.f);
     array_3d_scalar_t data;
     TransferFunction transferFunction;
+    float3 aabbPositions[2] = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
 
+    bool openInstanceWindow = false;
+    bool addInstanceWindow = false;
     std::vector<Instance> instances;
-    int SELECTED_VOLUME_INSTANCE = 0;
+    int SELECTED_INSTANCE = 0;
+    const char* current_instance = NULL;
+    int current_instance_index = -1;
     int instanceUniqueName = 0;
     float3 defaultTransform = float3(0.f, 0.f, 0.f);
-    float3 aabbPositions[2] = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
+    int generateInstance = 1;
 };
 
 struct LoadInObj {
@@ -140,22 +145,31 @@ struct ConfigureImgui {
     uint64_t accId = 0;
 
     bool showImgui = true;
-    bool showLightControlPanel = false;
+    
     bool showObjControlPanel = false;
     bool addNewObj = false;
+
+    bool showVolumeControlPanel = false;
+    bool addNewVolume = false;
+
+    bool showLightControlPanel = false;
     bool addNewLight = false;
 
     bool updateObjSelection = false;
     bool updateObjTransform = false;
-    bool updateObjMaterials = false;    
+    bool updateObjMaterials = false;  
+
+    bool updateVolumeSelection = false;
+    bool updateVolumeTransform = false;
     bool updateLights = false;
 
     void render();
     void renderObjCP();
+    void renderVolumeCP();
     void renderLightCP();
 
     void initObj();
-    void createDefaultInstance(Obj& obj);
+    // void createDefaultInstance(Obj& obj);
     void objInstances();
     void addObjInstance(Obj& obj);
     void showSelectedObjCountWarning();
@@ -168,6 +182,13 @@ struct ConfigureImgui {
     void updateLight();
 
     void initVolume();
+    // void createDefaultInstance(Volume& volume);
+    void volumeInstances();
+    void addVolumeInstance(Volume& volume);
+    void updateTransform(Volume& volume);
+
+    template <typename T>
+    void createDefaultInstance(T& target);
 
     void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger);
 };

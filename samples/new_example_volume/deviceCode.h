@@ -126,6 +126,7 @@ struct ScatterResult
     float3 scatteredOrigin;
     float3 scatteredDirection;
     float3 attenuation;
+    bool isObj;
     float3 normal;
     
     bool volume_hit;

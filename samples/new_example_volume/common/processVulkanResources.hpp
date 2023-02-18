@@ -79,6 +79,7 @@ struct VulkanResources {
         GPRTBufferOf<int> tfnOpacitySizeBuffer;
     };
     std::vector<GeometryVolume> listOfGeometryVolume;
+    float3 emptyAABB[2] = {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}};
     GeometryVolume trashGeometryVolume;
 
     // General
@@ -86,10 +87,13 @@ struct VulkanResources {
     GPRTModule module;
 
     // Accel
-    std::vector<float4x4> transforms;
-    GPRTBufferOf<float4x4> transformBuffer;
+    std::vector<float4x4> transformsObj;
+    GPRTBufferOf<float4x4> transformObjBuffer;
     std::vector<GPRTAccel> listOfTrianglesBLAS;
     GPRTAccel trianglesTLAS;
+
+    std::vector<float4x4> transformsVolume;
+    GPRTBufferOf<float4x4> transformVolumeBuffer;
     std::vector<GPRTAccel> listOfVolumesBLAS;
     GPRTAccel aabbTLAS;
 
@@ -120,6 +124,7 @@ struct VulkanResources {
     void resetVulkanGeometryResources(GPRTProgram new_example_deviceCode);
     void refreshObj();
     void refreshObjMaterial();
+    void refreshVolume();
     void refreshLights();
     void updateGeometryMaterial(Geometry &geometry, Obj &obj);
     void updateVulkanResources();
