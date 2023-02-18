@@ -30,7 +30,9 @@ std::string check_valid_extension(std::string filename);
 void extract_root_and_workdir(std::string &file_path, json &root, std::string &workdir);
 void reverse_byte_order(char* data, size_t elemCount, size_t elemSize);
 void create_scene_volume(json &jsdata, std::string &workdir, Volume &volume);
+void create_scene_camera(const json& jsview, Volume &volume);
 float2 range_from_json(json jsrange);
 void create_scene_tfn(const json& jsview, Volume &volume);
 void load_volume_data_from_file(Volume &volume);
+float2 get_volume_value_range(array_3d_scalar_t data);
 #endif

@@ -26,8 +26,21 @@
 
 /* variables available to all programs */
 
-struct AABBGeomData {
-  alignas(8) int tmp;   // unused for now
+struct VolumesGeomData {
+  alignas(16) gprt::Buffer volume;          // float3
+  alignas(16) int volume_size;              // int
+
+  alignas(16) gprt::Buffer tfn_color;       // float4
+  alignas(16) int tfn_color_size;           // int
+
+  alignas(16) gprt::Buffer tfn_opacity;     // float
+  alignas(16) int tfn_opacity_size;         // int
+
+  alignas(16) gprt::Buffer tfn_value_range; // float2
+
+  alignas(16) gprt::Buffer volume_size_buffer;
+  alignas(16) gprt::Buffer tfn_color_size_buffer;
+  alignas(16) gprt::Buffer tfn_opacity_size_buffer;
 };
 
 /* variables for the triangle mesh geometry */
@@ -108,12 +121,17 @@ struct RandSeed {
 
 struct ScatterResult
 {
+    RandSeed rand;
+
     int scatterEvent;
     float3 scatteredOrigin;
     float3 scatteredDirection;
     float3 attenuation;
     float3 normal;
-    RandSeed rand;
+    
+    bool volume_hit;
+    float volume_t;
+    float3 volume_albedo;
 };
 
 struct Payload
@@ -126,5 +144,9 @@ struct Payload
 struct Attributes {
   float2 bc;
   float3 color;
+
+  // ray t
+  float t_min;
+  float t_max;
 };
 #endif

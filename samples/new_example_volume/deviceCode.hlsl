@@ -53,6 +53,7 @@ uint rand_init(uint val0, uint val1)
   return v0;
 }
 
+// Generate random unsigned int in [0, 2^24)
 RandSeed rand_generate(RandSeed rand_seed, int number)
 {
   const uint32_t LCG_A = 1664525u;
@@ -112,14 +113,24 @@ float3 cartesian(float phi, float sinTheta, float cosTheta)
   return float3(cosPhi * sinTheta, sinPhi * sinTheta, cosTheta);
 }
 
-static float3 russian_roulette(int scatter_index, float3 attenuation)
+float3 uniform_sample_sphere(float radius, float2 s)
+{
+  float phi = 2 * M_PI * s.x;
+  float cosTheta = radius * (1.f - 2.f * s.y);
+  float sinTheta = 2.f * radius * sqrt(s.y * (1.f - s.y));
+  return cartesian(phi, sinTheta, cosTheta);
+}
+
+static RandSeed russian_roulette(int scatter_index, float3 attenuation, RandSeed rand)
 {
   if (scatter_index > 5) {
     float q = (.05f < attenuation.y) ? 1 - attenuation.y : .05f;
 
-    float2 compare = rand_2_10(float2(attenuation.x, attenuation.y));
+    rand = rand_generate(rand, 2);
+    float2 compare = rand.random_number_2;
     if (compare.x > compare.y)
-        return float3(0.f, 0.f, 0.f);
+        rand.random_number_3 = float3(0.f, 0.f, 0.f);
+        return rand;
     
     if(1 == q){
       attenuation = float3(1.f, 1.f, 1.f);
@@ -128,7 +139,8 @@ static float3 russian_roulette(int scatter_index, float3 attenuation)
     }
     
   }
-  return attenuation;
+  rand.random_number_3 = attenuation;
+  return rand;
 }
 
 float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record, ScatterResult lastScatterResult, float3 attenuation) {
@@ -191,7 +203,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
     RayDesc rayDesc;
     payload.rand = rand_generate(payload.rand, 2);
     rayDesc.Origin = record.camera.pos;
-    rayDesc.Origin += rand_3_10(payload.rand.random_number_2) / (float2(fbSize).x - 1);
+    rayDesc.Origin += uniform_sample_sphere(1, payload.rand.random_number_2) / (float2(fbSize).x - 1);
     rayDesc.Direction = 
       normalize(record.camera.dir_00
       + screen.x * record.camera.dir_du
@@ -218,14 +230,19 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
       if (payload.scatterResult.scatterEvent == 2) {
         // Miss
-        total_payload_color += payload.color * attenuation;
-        
-        // Calculate Light
-        if (i > 0) {
-          total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
-        }
+        // total_payload_color += payload.color * attenuation;
+        // total_payload_color = float3(1.f, 0.f, 0.f);
+
+        // if (i > 0) {
+        //   total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
+        //   // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+        // }
         break;
-      } else if (payload.scatterResult.scatterEvent == 0) {
+      } else if (payload.scatterResult.scatterEvent == 0) { // Leave AABB
+        if (i > 0) {
+          total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
+          // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+        }
         break;
       } else {
         attenuation *= payload.scatterResult.attenuation;
@@ -236,7 +253,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       }
 
       // Possibly terminate the path with Russian roulette
-      attenuation = russian_roulette(i, attenuation);
+      payload.rand = russian_roulette(i, attenuation, payload.rand);
+      attenuation = payload.rand.random_number_3;
       if (attenuation.x == 0.f && attenuation.y == 0.f && attenuation.z == 0.f) break;
     }
   }
@@ -251,6 +269,51 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
   gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
 }
 
+float fmaf(float a, float b, float c)
+{
+  return a * b + c;
+}
+
+float __frcp_rn(float a)
+{
+  return 1 / a;
+}
+
+float reduce_max(float3 v) {
+  return max(max(v.x, v.y),v.z);
+}
+
+float reduce_min(float3 v) {
+  return min(min(v.x, v.y),v.z);
+}
+
+float2 intersect_box(float t0, float t1, float3 ray_org, float3 ray_dir, float3 lower, float3 upper)
+{
+  // Option 1
+  float float_large = 3.402823466e+38F;
+  float float_small = 1.175494351e-38F;
+  int3 is_small = int3(abs(ray_dir.x) < float_small, abs(ray_dir.y) < float_small, abs(ray_dir.z) < float_small);
+  float3 rcp_dir = float3(__frcp_rn(ray_dir.x), __frcp_rn(ray_dir.y), __frcp_rn(ray_dir.z));
+  float3 t_lo = float3(is_small.x ? float_large : (lower.x - ray_org.x) * rcp_dir.x, //
+                           is_small.y ? float_large : (lower.y - ray_org.y) * rcp_dir.y, //
+                           is_small.z ? float_large : (lower.z - ray_org.z) * rcp_dir.z  //
+  );
+  float3 t_hi = float3(is_small.x ? -float_large : (upper.x - ray_org.x) * rcp_dir.x, //
+                           is_small.y ? -float_large : (upper.y - ray_org.y) * rcp_dir.y, //
+                           is_small.z ? -float_large : (upper.z - ray_org.z) * rcp_dir.z  //
+  );
+  t0 = max(t0, reduce_max(min(t_lo, t_hi)));
+  t1 = min(t1, reduce_min(max(t_lo, t_hi)));
+
+  // Option 2
+  // float3 t_lo = (lower - ray_org) / ray_dir;
+  // float3 t_hi = (upper - ray_org) / ray_dir;
+  // t0 = max(t0, reduce_max(min(t_lo, t_hi)));
+  // t1 = min(t1, reduce_min(max(t_lo, t_hi)));
+
+  return float2(t0, t1);
+}
+
 // This intersection program will be called when rays hit our axis
 // aligned bounding boxes. Here, we can fetch per-geometry data and
 // process that data, but we do not have access to the ray payload
@@ -258,11 +321,98 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 //
 // Instead, we pass data through a customizable Attributes structure
 // for further processing by closest hit / any hit programs.
-GPRT_INTERSECTION_PROGRAM(AABBIntersection, (AABBGeomData, record))
+GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
 {
   Attributes attr;
-  attr.color = float3(1.f, 1.f, 1.f);
-  ReportHit(0.1f, /*hitKind*/ 0, attr);
+  attr.color = float3(1000.f, 0.f, 0.f);
+  attr.color = float3(0.f, 0.f, 0.f);
+
+  float3 org = ObjectRayOrigin();
+  float3 dir = ObjectRayDirection();
+  float3 lower = float3(0, 0, 0);
+  float3 upper = float3(1, 1, 1);
+  // lower = mul(float3(0, 0, 0), (float3x3)WorldToObject4x3());
+  // upper = mul(float3(639, 219, 228), (float3x3)WorldToObject4x3());
+
+  float t0 = RayTMin();
+  float t1 = RayTCurrent();
+
+  float2 t_result = intersect_box(t0, t1, org, dir, lower, upper);
+  if (t_result.y > t_result.x) {
+    attr.t_min = t_result.x;
+    attr.t_max = t_result.y;
+    ReportHit(t_result.x, /*hitKind*/ 0, attr);
+  }
+}
+
+float sample_volume_object_space(VolumesGeomData record, float3 p)
+{
+  // calculate with volume
+  int3 volume_size = gprt::load<int3>(record.volume_size_buffer, 0);
+  int volume_size_long_product = volume_size.x * volume_size.y * volume_size.z;
+
+  // Spaces
+  p = mul(p, (float3x3)ObjectToWorld4x3());
+  return gprt::load<float>(record.volume, volume_size.x * volume_size.y * int(p.z) + volume_size.x * int(p.y) + int(p.x));
+
+  // World
+  // p.x = clamp(p.x, 0.f, volume_size.x - 1);
+  // p.y = clamp(p.y, 0.f, volume_size.y - 1);
+  // p.z = clamp(p.z, 0.f, volume_size.z - 1);
+  // return gprt::load<float>(record.volume, volume_size.x * volume_size.y * int(p.z) + volume_size.x * int(p.y) + int(p.x));
+} 
+
+float4 sample_transfer_function(VolumesGeomData record, float sample_point)
+{
+  float2 value_range = gprt::load<float2>(record.tfn_value_range, 0);
+  float scale = 1.f / (value_range.y - value_range.x);
+  float v = (clamp(sample_point, value_range.x, value_range.y) - value_range.x) * scale;
+
+  int tfn_color_size = gprt::load<int>(record.tfn_color_size_buffer, 0);
+  float index = fmaf(v, float(tfn_color_size - 1), 0.5f);
+  float4 rgba = gprt::load<float4>(record.tfn_color, int(index));
+
+  int tfn_opacity_size = gprt::load<int>(record.tfn_opacity_size_buffer, 0);
+  index = fmaf(v, float(tfn_opacity_size - 1), 0.5f);
+  rgba.w = gprt::load<float>(record.tfn_opacity, int(index)); // followed by the alpha correction
+
+  return rgba;
+}
+
+ScatterResult delta_tracking(VolumesGeomData record, Payload payload, float3 rayOrg, float3 rayDir, float t_min, float t_max)
+{
+  float density_scale = 1.f;
+  float max_opacity = 1.f;
+  float mu_max = density_scale * max_opacity;
+
+  float3 albedo = float3(0.f, 0.f, 0.f);
+  bool found_hit = false;
+  ScatterResult result;
+  result.rand = rand_generate(payload.rand, 2);
+  float t = t_min;
+  while (true) {
+    float2 xi = result.rand.random_number_2;
+    t = t + -log(1.f - xi.x) / mu_max;
+
+    if (t > t_max) {
+      found_hit = false;
+      break;
+    }
+
+    float sample_point = sample_volume_object_space(record, rayOrg + rayDir * t); //Current is world space
+    float4 rgba = sample_transfer_function(record, sample_point);
+    albedo = float3(rgba.x, rgba.y, rgba.z);
+    float mu_t = density_scale * rgba.w;
+    if (xi.y < mu_t / mu_max) {
+      found_hit = true;
+      break;
+    }
+    result.rand = rand_generate(result.rand, 2);
+  }
+  result.volume_t = t;
+  result.volume_albedo = albedo;
+  result.volume_hit = found_hit;
+  return result;
 }
 
 // This closest hit program will be called when our intersection program
@@ -275,11 +425,29 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (AABBGeomData, record))
 //
 // Also note, this program is also called after all ReportHit's have been
 // called and we can conclude which reported hit is closest.
-GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (AABBGeomData, record), (Payload, payload), (Attributes, attributes))
+GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
-  payload.color = attributes.color;
   ScatterResult result;
-  result.scatterEvent = 2;
+  float3 rayOrg = ObjectRayOrigin();
+  float3 rayDir = ObjectRayDirection();
+  // rayOrg = WorldRayOrigin();
+  // rayDir = WorldRayDirection();
+  
+  // See if delta tracking returns hit
+  result = delta_tracking(record, payload, rayOrg, rayDir, attributes.t_min, attributes.t_max);
+
+  // If not hit by delta tracking, return
+  if (!result.volume_hit) {
+    result.scatterEvent        = 0;
+  }
+  // If hit by delta tracking, sample random direction
+  else {
+    result.scatterEvent        = 1;
+    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.volume_t;
+    result.rand                = rand_generate(result.rand, 2);
+    result.scatteredDirection  = mul(uniform_sample_sphere(1, result.rand.random_number_2), (float3x3)ObjectToWorld4x3());
+    result.attenuation         = result.volume_albedo;
+  }
   payload.scatterResult = result;
 }
 

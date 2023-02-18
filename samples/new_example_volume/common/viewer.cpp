@@ -325,6 +325,14 @@ void Viewer::init(GPRTProgram new_example_deviceCode)
                             cosFovy);
     vulkanResources.configureImgui.initObj();
     vulkanResources.configureImgui.initVolume();
+    // lookFrom = float3(288.962f, 70.1202f, 121.871f);
+    // lookAt = float3(423.f, 295.f, 105.f);
+    // lookUp = float3(0.38687627268161939f, 0.84789666508123507f, -0.36248861358682333f);
+    // cosFovy = 45;
+    // camera.setOrientation(lookFrom,
+    //                         lookAt,
+    //                         lookUp,
+    //                         cosFovy);
     // vulkanResources.configureImgui.initLight();
     deviceCode = new_example_deviceCode;
     vulkanResources.initialVulkanResources(deviceCode);

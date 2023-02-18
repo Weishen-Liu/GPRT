@@ -101,12 +101,59 @@ void VulkanResources::createVolume(Volume &volume) {
     loadVolume(volume);
 
     GeometryVolume newGeometryVolume;
+    float2 value_range = get_volume_value_range(volume.data);
+    volume.aabbPositions[0] = float3(0, 0, 0);
+    volume.aabbPositions[1] = float3(639, 219, 228);
+
     // Create our AABB geometry. Every AABB is defined using two float3's. The
     // first float3 defines the bottom lower left near corner, and the second
     // float3 defines the upper far right corner.
-    newGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, configureImgui.aabbPositions);
-    newGeometryVolume.aabbGeom = gprtGeomCreate<AABBGeomData>(context, aabbGeomType);
+    newGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, volume.aabbPositions);
+    newGeometryVolume.aabbGeom = gprtGeomCreate<VolumesGeomData>(context, aabbGeomType);
     gprtAABBsSetPositions(newGeometryVolume.aabbGeom, newGeometryVolume.aabbPositionsBuffer, 1 /* just one aabb */);
+
+    // float3 scale = volume.grid_spacing * float3(volume.data->dims.x, volume.data->dims.y, volume.data->dims.z);
+    // gdt::vec3f scale_gdt = gdt::vec3f(scale.x, scale.y, scale.z);
+    // float3 translate = volume.grid_origin;
+    // gdt::vec3f translate_gdt = gdt::vec3f(translate.x, translate.y, translate.z);
+    // newGeometryVolume.matrix = gdt::affine3f::translate(translate_gdt) * gdt::affine3f::scale(scale_gdt);
+
+    int volume_size = volume.data->dims.long_product();
+    int tfn_color_size = int(volume.transferFunction.color->size() / 4);
+    int tfn_opacity_size = int(volume.transferFunction.opacity->size() / 2);
+
+    newGeometryVolume.volumeBuffer = gprtDeviceBufferCreate<float>(context, volume_size, static_cast<const void *>(volume.data->data()));
+    
+    newGeometryVolume.volume_scale = 1.f / (value_range.y - value_range.x);
+    newGeometryVolume.tfn_value_range.x = value_range.x;
+    newGeometryVolume.tfn_value_range.y = value_range.y;
+    newGeometryVolume.tfn_range_rcp_norm = 1.f / (newGeometryVolume.tfn_value_range.y - newGeometryVolume.tfn_value_range.x);
+
+    newGeometryVolume.tfn_opacity_data.resize(tfn_opacity_size);
+    for (int i = 0; i < newGeometryVolume.tfn_opacity_data.size(); ++i) {
+        newGeometryVolume.tfn_opacity_data[i] = ((float*)volume.transferFunction.opacity->data())[2 * i + 1];
+    }
+
+    newGeometryVolume.tfnColorBuffer = gprtDeviceBufferCreate<float4>(context, tfn_color_size, static_cast<const void *>(volume.transferFunction.color->data()));
+    newGeometryVolume.tfnOpacityBuffer = gprtDeviceBufferCreate<float>(context, tfn_opacity_size, static_cast<const void *>(newGeometryVolume.tfn_opacity_data.data()));
+    newGeometryVolume.tfnValueRangeBuffer = gprtDeviceBufferCreate<float2>(context, 1, &newGeometryVolume.tfn_value_range);
+
+    newGeometryVolume.volumeData = gprtGeomGetParameters(newGeometryVolume.aabbGeom);
+    newGeometryVolume.volumeData->volume = gprtBufferGetHandle(newGeometryVolume.volumeBuffer);
+    newGeometryVolume.volumeData->tfn_color = gprtBufferGetHandle(newGeometryVolume.tfnColorBuffer);
+    newGeometryVolume.volumeData->tfn_opacity = gprtBufferGetHandle(newGeometryVolume.tfnOpacityBuffer);
+    newGeometryVolume.volumeData->tfn_value_range = gprtBufferGetHandle(newGeometryVolume.tfnValueRangeBuffer);
+
+    newGeometryVolume.volumeData->volume_size = volume_size;
+    newGeometryVolume.volumeData->tfn_color_size = tfn_color_size;
+    newGeometryVolume.volumeData->tfn_opacity_size = tfn_opacity_size;
+
+    newGeometryVolume.volumeSizeBuffer = gprtDeviceBufferCreate<int3>(context, 1, &volume.data->dims);
+    newGeometryVolume.tfnColorSizeBuffer = gprtDeviceBufferCreate<int>(context, 1, &tfn_color_size);
+    newGeometryVolume.tfnOpacitySizeBuffer = gprtDeviceBufferCreate<int>(context, 1, &tfn_opacity_size);
+    newGeometryVolume.volumeData->volume_size_buffer = gprtBufferGetHandle(newGeometryVolume.volumeSizeBuffer);
+    newGeometryVolume.volumeData->tfn_color_size_buffer = gprtBufferGetHandle(newGeometryVolume.tfnColorSizeBuffer);
+    newGeometryVolume.volumeData->tfn_opacity_size_buffer = gprtBufferGetHandle(newGeometryVolume.tfnOpacitySizeBuffer);
 
     // Note, we must create an "AABB" accel rather than a triangles accel.
     newGeometryVolume.aabbBLAS = gprtAABBAccelCreate(context, 1, &newGeometryVolume.aabbGeom);
@@ -288,7 +335,7 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
     trianglesGeomType = gprtGeomTypeCreate<TrianglesGeomData>(context, GPRT_TRIANGLES);
     gprtGeomTypeSetClosestHitProg(trianglesGeomType, 0, module, "TriangleMesh");
 
-    aabbGeomType = gprtGeomTypeCreate<AABBGeomData>(context, GPRT_AABBS /* <- This is new! */);
+    aabbGeomType = gprtGeomTypeCreate<VolumesGeomData>(context, GPRT_AABBS /* <- This is new! */);
     gprtGeomTypeSetClosestHitProg(aabbGeomType, 0, module, "AABBClosestHit");
     gprtGeomTypeSetIntersectionProg(aabbGeomType, 0, module, "AABBIntersection");
 
@@ -347,12 +394,13 @@ void VulkanResources::createVolumeAccel() {
     //     aabbTLAS = gprtInstanceAccelCreate(context, listOfVolumesBLAS.size(), listOfVolumesBLAS.data());
 
     //     transformBuffer = gprtDeviceBufferCreate<float4x4>(context, transforms.size(), transforms.data());
-    //     gprtInstanceAccelSet4x4Transforms(trianglesTLAS, transformBuffer);
-    //     // triangle and AABB accels can be combined in a top level tree
-    //     gprtAccelBuild(context, aabbTLAS);
+    //     gprtInstanceAccelSet4x4Transforms(aabbTLAS, transformBuffer);
     // } else {
-    //     trianglesTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometry.trianglesBLAS);
+    //     aabbTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometryVolume.aabbBLAS);
     // }
+
+    // // triangle and AABB accels can be combined in a top level tree
+    // gprtAccelBuild(context, aabbTLAS);
 
     aabbTLAS = gprtInstanceAccelCreate(context, listOfVolumesBLAS.size(), listOfVolumesBLAS.data());
     transformBuffer = gprtDeviceBufferCreate<float4x4>(context, transforms.size(), transforms.data());
@@ -443,6 +491,10 @@ void VulkanResources::destoryVulkanResources() {
     for (auto &eachGeo: listOfGeometryVolume) 
     {
         gprtBufferDestroy(eachGeo.aabbPositionsBuffer);
+        gprtBufferDestroy(eachGeo.volumeBuffer);
+        gprtBufferDestroy(eachGeo.tfnColorBuffer);
+        gprtBufferDestroy(eachGeo.tfnOpacityBuffer);
+        gprtBufferDestroy(eachGeo.tfnValueRangeBuffer);
         gprtAccelDestroy(eachGeo.aabbBLAS);
         gprtGeomDestroy(eachGeo.aabbGeom);
     }
