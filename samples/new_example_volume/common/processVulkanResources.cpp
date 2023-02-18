@@ -102,8 +102,6 @@ void VulkanResources::createVolume(Volume &volume) {
 
     GeometryVolume newGeometryVolume;
     float2 value_range = get_volume_value_range(volume.data);
-    volume.aabbPositions[0] = float3(0, 0, 0);
-    volume.aabbPositions[1] = float3(639, 219, 228);
 
     // Create our AABB geometry. Every AABB is defined using two float3's. The
     // first float3 defines the bottom lower left near corner, and the second
@@ -139,14 +137,15 @@ void VulkanResources::createVolume(Volume &volume) {
     newGeometryVolume.tfnValueRangeBuffer = gprtDeviceBufferCreate<float2>(context, 1, &newGeometryVolume.tfn_value_range);
 
     newGeometryVolume.volumeData = gprtGeomGetParameters(newGeometryVolume.aabbGeom);
+    newGeometryVolume.volumeData->aabb_position = gprtBufferGetHandle(newGeometryVolume.aabbPositionsBuffer);
     newGeometryVolume.volumeData->volume = gprtBufferGetHandle(newGeometryVolume.volumeBuffer);
     newGeometryVolume.volumeData->tfn_color = gprtBufferGetHandle(newGeometryVolume.tfnColorBuffer);
     newGeometryVolume.volumeData->tfn_opacity = gprtBufferGetHandle(newGeometryVolume.tfnOpacityBuffer);
     newGeometryVolume.volumeData->tfn_value_range = gprtBufferGetHandle(newGeometryVolume.tfnValueRangeBuffer);
 
-    newGeometryVolume.volumeData->volume_size = volume_size;
-    newGeometryVolume.volumeData->tfn_color_size = tfn_color_size;
-    newGeometryVolume.volumeData->tfn_opacity_size = tfn_opacity_size;
+    // newGeometryVolume.volumeData->volume_size = volume_size;
+    // newGeometryVolume.volumeData->tfn_color_size = tfn_color_size;
+    // newGeometryVolume.volumeData->tfn_opacity_size = tfn_opacity_size;
 
     newGeometryVolume.volumeSizeBuffer = gprtDeviceBufferCreate<int3>(context, 1, &volume.data->dims);
     newGeometryVolume.tfnColorSizeBuffer = gprtDeviceBufferCreate<int>(context, 1, &tfn_color_size);

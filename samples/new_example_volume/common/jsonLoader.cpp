@@ -236,6 +236,13 @@ void create_scene_tfn(const json& jsview, Volume &volume)
     /* calculate the volume value range ... */
     throw std::runtime_error("unknown data range");
   }
+
+  // AABB
+  if (jsvolume.contains(BOUNDING_BOX)) {
+    const auto& jsboundingbox = jsvolume[BOUNDING_BOX];
+    volume.aabbPositions[0] = scalar_from_json<float3>(jsboundingbox[MINIMUM]);
+    volume.aabbPositions[1] = scalar_from_json<float3>(jsboundingbox[MAXIMUM]);
+  }
 }
 
 void create_scene_camera(const json& jsview, Volume &volume)
