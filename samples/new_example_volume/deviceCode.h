@@ -27,16 +27,15 @@
 /* variables available to all programs */
 
 struct VolumesGeomData {
+  alignas(16) gprt::Buffer aabb_position;
   alignas(16) gprt::Buffer volume;          // float3
-  alignas(16) int volume_size;              // int
-
   alignas(16) gprt::Buffer tfn_color;       // float4
-  alignas(16) int tfn_color_size;           // int
-
   alignas(16) gprt::Buffer tfn_opacity;     // float
-  alignas(16) int tfn_opacity_size;         // int
-
   alignas(16) gprt::Buffer tfn_value_range; // float2
+
+//   alignas(16) int volume_size;              // int
+//   alignas(16) int tfn_color_size;           // int
+//   alignas(16) int tfn_opacity_size;         // int
 
   alignas(16) gprt::Buffer volume_size_buffer;
   alignas(16) gprt::Buffer tfn_color_size_buffer;

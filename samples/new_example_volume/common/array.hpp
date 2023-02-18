@@ -28,11 +28,14 @@ using json = nlohmann::json;
 #define UP "up"
 #define FOVY "fovy"
 #define CAMERA "camera"
+#define BOUNDING_BOX "boundingBox"
 #define DATA_SOURCE "dataSource"
 #define VIEW "view"
 #define POSITION "position"
 #define LIGHT_SOURCE "lightSource"
 #define SAMPLING_DISTANCE "sampleDistance"
+#define MAXIMUM "maximum"
+#define MINIMUM "minimum"
 
 enum ValueType {
   VALUE_TYPE_UINT8 = 100,

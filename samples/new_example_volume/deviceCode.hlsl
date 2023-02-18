@@ -329,10 +329,10 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
 
   float3 org = ObjectRayOrigin();
   float3 dir = ObjectRayDirection();
-  float3 lower = float3(0, 0, 0);
-  float3 upper = float3(1, 1, 1);
-  // lower = mul(float3(0, 0, 0), (float3x3)WorldToObject4x3());
-  // upper = mul(float3(639, 219, 228), (float3x3)WorldToObject4x3());
+  float3 aabb_lower = gprt::load<float3>(record.aabb_position, 0);
+  float3 aabb_upper = gprt::load<float3>(record.aabb_position, 1);
+  float3 lower = mul(aabb_lower, (float3x3)WorldToObject4x3());
+  float3 upper = mul(aabb_upper, (float3x3)WorldToObject4x3());
 
   float t0 = RayTMin();
   float t1 = RayTCurrent();
