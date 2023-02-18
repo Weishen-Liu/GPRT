@@ -31,7 +31,7 @@ void ConfigureImgui::initObj()
     for (auto &each_obj: LIST_OF_OBJS) {
         for (auto &each_instance: each_obj.instances) {
             if (each_instance.choosed) {
-                each_obj.SELECTED_OBJ_INSTANCE++;
+                each_obj.SELECTED_INSTANCE++;
             }
         }
     }
@@ -82,37 +82,50 @@ void ConfigureImgui::initVolume()
         newVolume.path = INITIAL_VOLUME[i]->path;
         LIST_OF_VOLUMES.push_back(newVolume);
     }
+
+    for (auto &each_volume: LIST_OF_VOLUMES) {
+        for (auto &each_instance: each_volume.instances) {
+            if (each_instance.choosed) {
+                each_volume.SELECTED_INSTANCE++;
+            }
+        }
+    }
 }
 
-void ConfigureImgui::createDefaultInstance(Obj& obj)
+template <typename T>
+void ConfigureImgui::createDefaultInstance(T& target)
 {
-    for (int i = 0; i < obj.generateInstance; i++)
+    for (int i = 0; i < target.generateInstance; i++)
     {
         Instance instance;
-        instance.transform = obj.defaultTransform;
-        instance.name = obj.name + " " +std::to_string(obj.instanceUniqueName);
-        obj.instanceUniqueName++;
-        obj.instances.push_back(instance);
+        instance.transform = target.defaultTransform;
+        instance.name = target.name + " " +std::to_string(target.instanceUniqueName);
+        target.instanceUniqueName++;
+        target.instances.push_back(instance);
     }
-    updateObjSelection = true;
+    if (typeid(T) == typeid(Obj)) {
+        updateObjSelection = true;
+    } else if (typeid(T) == typeid(Volume)) {
+        updateVolumeSelection = true;
+    }
 }
 
 void ConfigureImgui::addObjInstance(Obj& obj)
 {
-    if (obj.addObjInstanceWindow)
+    if (obj.addInstanceWindow)
     {
         const char* item = obj.name.c_str();
         std::string windowName = "Instances for " + obj.name;
-        ImGui::Begin(windowName.c_str(), &obj.addObjInstanceWindow);
+        ImGui::Begin(windowName.c_str(), &obj.addInstanceWindow);
         ImGui::Text("Generate"); ImGui::SameLine();
         std::string generateInstanceName = " Instance for " + obj.name;
         ImGui::SliderInt(generateInstanceName.c_str(), &obj.generateInstance, 1, 3);
         if (ImGui::Button("Create Instances"))
         {
-            createDefaultInstance(obj);
+            createDefaultInstance<Obj>(obj);
         }
         ImGui::Text("");
-        ImGui::Text("Selected %d Instances under Obj '%s'", obj.SELECTED_OBJ_INSTANCE, item);
+        ImGui::Text("Selected %d Instances under Obj '%s'", obj.SELECTED_INSTANCE, item);
         for (int eachInstance = 0; eachInstance < obj.instances.size(); eachInstance++)
         {
             const char* instance_name = obj.instances[eachInstance].name.c_str();
@@ -125,9 +138,9 @@ void ConfigureImgui::addObjInstance(Obj& obj)
                         obj.current_instance = NULL;
                         obj.current_instance_index = -1;
                     }
-                    obj.SELECTED_OBJ_INSTANCE -= 1;
+                    obj.SELECTED_INSTANCE -= 1;
                 } else {
-                    obj.SELECTED_OBJ_INSTANCE += 1;
+                    obj.SELECTED_INSTANCE += 1;
                 }
             }
         }
@@ -144,9 +157,9 @@ void ConfigureImgui::objInstances()
         {
             ImGui::Begin(item, &LIST_OF_OBJS[eachObj].openInstanceWindow);
             // Add Instance Window
-            if (ImGui::Button("Add Instance"))
+            if (ImGui::Button("Add Object Instance"))
             {
-                LIST_OF_OBJS[eachObj].addObjInstanceWindow = !LIST_OF_OBJS[eachObj].addObjInstanceWindow;
+                LIST_OF_OBJS[eachObj].addInstanceWindow = !LIST_OF_OBJS[eachObj].addInstanceWindow;
             }
             addObjInstance(LIST_OF_OBJS[eachObj]);
 
@@ -177,6 +190,91 @@ void ConfigureImgui::objInstances()
             if (LIST_OF_OBJS[eachObj].current_instance != NULL) {
                 updateTransform(LIST_OF_OBJS[eachObj]);
                 updateMaterial(LIST_OF_OBJS[eachObj]);
+            }
+            ImGui::End();
+        }
+    }
+}
+
+void ConfigureImgui::addVolumeInstance(Volume& volume)
+{
+    if (volume.addInstanceWindow)
+    {
+        const char* item = volume.name.c_str();
+        std::string windowName = "Instances for " + volume.name;
+        ImGui::Begin(windowName.c_str(), &volume.addInstanceWindow);
+        ImGui::Text("Generate"); ImGui::SameLine();
+        std::string generateInstanceName = " Instance for " + volume.name;
+        ImGui::SliderInt(generateInstanceName.c_str(), &volume.generateInstance, 1, 3);
+        if (ImGui::Button("Create Volume Instances"))
+        {
+            createDefaultInstance<Volume>(volume);
+        }
+        ImGui::Text("");
+        ImGui::Text("Selected %d Instances under Volume '%s'", volume.SELECTED_INSTANCE, item);
+        for (int eachInstance = 0; eachInstance < volume.instances.size(); eachInstance++)
+        {
+            const char* instance_name = volume.instances[eachInstance].name.c_str();
+            if (ImGui::Checkbox(instance_name, &volume.instances[eachInstance].choosed))
+            {
+                updateVolumeSelection = true;
+                if (volume.instances[eachInstance].choosed == false) {
+                    if (volume.current_instance == instance_name)
+                    {
+                        volume.current_instance = NULL;
+                        volume.current_instance_index = -1;
+                    }
+                    volume.SELECTED_INSTANCE -= 1;
+                } else {
+                    volume.SELECTED_INSTANCE += 1;
+                }
+            }
+        }
+        ImGui::End();
+    }
+}
+
+void ConfigureImgui::volumeInstances()
+{
+    for (int eachVolume = 0; eachVolume < LIST_OF_VOLUMES.size(); eachVolume++)
+    {
+        const char* item = LIST_OF_VOLUMES[eachVolume].name.c_str();
+        if (LIST_OF_VOLUMES[eachVolume].openInstanceWindow)
+        {
+            ImGui::Begin(item, &LIST_OF_VOLUMES[eachVolume].openInstanceWindow);
+            // Add Instance Window
+            if (ImGui::Button("Add Volume Instance"))
+            {
+                LIST_OF_VOLUMES[eachVolume].addInstanceWindow = !LIST_OF_VOLUMES[eachVolume].addInstanceWindow;
+            }
+            addVolumeInstance(LIST_OF_VOLUMES[eachVolume]);
+
+            // Configure Instance Transform
+            ImGui::Text("Loaded "); ImGui::SameLine();
+            if (ImGui::BeginCombo(" Instance", LIST_OF_VOLUMES[eachVolume].current_instance)) // The second parameter is the label previewed before opening the combo.
+            {
+                for (int n = 0; n < LIST_OF_VOLUMES[eachVolume].instances.size(); n++)
+                {
+                    const char* isntance_name = LIST_OF_VOLUMES[eachVolume].instances[n].name.c_str();
+                    bool is_selected = (LIST_OF_VOLUMES[eachVolume].current_instance == isntance_name); // You can store your selection however you want, outside or inside your objects
+                    if (LIST_OF_VOLUMES[eachVolume].instances[n].choosed == false)
+                    {
+                        continue;
+                    }
+                    if (ImGui::Selectable(isntance_name, is_selected))
+                    {
+                        LIST_OF_VOLUMES[eachVolume].current_instance = isntance_name;
+                        LIST_OF_VOLUMES[eachVolume].current_instance_index = n;
+                    }
+                    if (is_selected)
+                    {
+                        ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (LIST_OF_VOLUMES[eachVolume].current_instance != NULL) {
+                updateTransform(LIST_OF_VOLUMES[eachVolume]);
             }
             ImGui::End();
         }
@@ -217,6 +315,11 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
 void ConfigureImgui::updateTransform(Obj& obj)
 {
     inputAndSlider(obj.instances[obj.current_instance_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
+}
+
+void ConfigureImgui::updateTransform(Volume& volume)
+{
+    inputAndSlider(volume.instances[volume.current_instance_index].transform, -100000.f, 100000.f, "Transform", "Transform Input", "Transform Slider", updateVolumeTransform);
 }
 
 void ConfigureImgui::updateMaterialDetail(Obj& obj)
@@ -295,6 +398,25 @@ void ConfigureImgui::renderObjCP()
     }
 }
 
+void ConfigureImgui::renderVolumeCP()
+{
+    if (showVolumeControlPanel)
+    {
+        ImGui::Begin("Volume Control Panel", &showVolumeControlPanel);
+
+        for (int i = 0; i < LIST_OF_VOLUMES.size(); i++)
+        {
+            const char* item = LIST_OF_VOLUMES[i].name.c_str();
+            if (ImGui::Button(item))
+            {
+                LIST_OF_VOLUMES[i].openInstanceWindow = !LIST_OF_VOLUMES[i].openInstanceWindow;
+            }
+        }
+        volumeInstances();
+        ImGui::End();
+    }
+}
+
 void ConfigureImgui::updateLight()
 {
     if (current_light.type == ALL_LIGHTS[0].c_str())
@@ -305,7 +427,7 @@ void ConfigureImgui::updateLight()
     {
         inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].intensity, 0.f, 100.f, "Intensity", "Directional Intensity Input", "Directional Intensity Slider", updateLights);
 
-        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].direction, -10.f, 10.f, "Direction", "Directional Direction Input", "Directional Direction Slider", updateLights);
+        inputAndSlider(LIST_OF_DIRECTIONAL_LIGHTS[current_light.index].direction, -1000.f, 1000.f, "Direction", "Directional Direction Input", "Directional Direction Slider", updateLights);
     }
 }
 
@@ -458,12 +580,18 @@ void ConfigureImgui::render()
             showObjControlPanel = !showObjControlPanel;
         }
 
+        if (ImGui::Button("Volume Control Panel"))
+        {
+            showVolumeControlPanel = !showVolumeControlPanel;
+        }
+
         if (ImGui::Button("Light Control Panel"))
         {
             showLightControlPanel = !showLightControlPanel;
         }
         
         renderObjCP();
+        renderVolumeCP();
         renderLightCP();
     }
     

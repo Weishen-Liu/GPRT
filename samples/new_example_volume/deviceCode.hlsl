@@ -160,22 +160,42 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
     float3 directionalLightDir = gprt::load<float3>(record.directional_lights_dir, each_light);
     rayDesc.Origin = lastScatterResult.scatteredOrigin;
     rayDesc.Direction = rayDesc.Origin + directionalLightDir;
-    if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
-      continue;
+    
+    // Obj
+    if (lastScatterResult.isObj) {
+      if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
+        continue;
+      }
+      TraceRay(
+        world, // the tree
+        RAY_FLAG_FORCE_OPAQUE, // ray flags
+        0xff, // instance inclusion mask
+        0, // ray type
+        1, // number of ray types
+        0, // miss type
+        rayDesc, // the ray to trace
+        payload // the payload IO
+      );
+      if (payload.scatterResult.scatterEvent == 2) {
+        total_lights_color += directionalLightIntensity * attenuation;
+      }
     }
-    TraceRay(
-      world, // the tree
-      RAY_FLAG_FORCE_OPAQUE, // ray flags
-      0xff, // instance inclusion mask
-      0, // ray type
-      1, // number of ray types
-      0, // miss type
-      rayDesc, // the ray to trace
-      payload // the payload IO
-    );
-    if (payload.scatterResult.scatterEvent == 2) {
-      total_lights_color += directionalLightIntensity * attenuation;
-    }
+    // Volume
+    else {
+      TraceRay(
+        world, // the tree
+        RAY_FLAG_FORCE_OPAQUE, // ray flags
+        0xff, // instance inclusion mask
+        0, // ray type
+        1, // number of ray types
+        0, // miss type
+        rayDesc, // the ray to trace
+        payload // the payload IO
+      );
+      if (payload.scatterResult.scatterEvent == 0) {
+        total_lights_color += directionalLightIntensity * attenuation;
+      }
+    } 
   }
 
   return total_lights_color;
@@ -186,6 +206,7 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   payload.color = float3(0.f, 0.f, 0.f);
   ScatterResult result;
   result.scatterEvent = 2;
+  result.isObj = true;
   payload.scatterResult = result;
 }
 
@@ -240,8 +261,8 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         break;
       } else if (payload.scatterResult.scatterEvent == 0) { // Leave AABB
         if (i > 0) {
-          total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
-          // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+          // total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
+          total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
         }
         break;
       } else {
@@ -329,10 +350,14 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
 
   float3 org = ObjectRayOrigin();
   float3 dir = ObjectRayDirection();
+  // org = WorldRayOrigin();
+  // dir = ObjectRayDirection();
   float3 aabb_lower = gprt::load<float3>(record.aabb_position, 0);
   float3 aabb_upper = gprt::load<float3>(record.aabb_position, 1);
   float3 lower = mul(aabb_lower, (float3x3)WorldToObject4x3());
   float3 upper = mul(aabb_upper, (float3x3)WorldToObject4x3());
+  // lower = aabb_lower;
+  // upper = aabb_upper;
 
   float t0 = RayTMin();
   float t1 = RayTCurrent();
@@ -447,6 +472,7 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
     result.rand                = rand_generate(result.rand, 2);
     result.scatteredDirection  = mul(uniform_sample_sphere(1, result.rand.random_number_2), (float3x3)ObjectToWorld4x3());
     result.attenuation         = result.volume_albedo;
+    result.isObj               = false;
   }
   payload.scatterResult = result;
 }
