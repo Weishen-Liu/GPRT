@@ -3,6 +3,7 @@
 #define INCLUDE_NEWEXAMPLE_COMMON_PROCESS_VULKAN_RESOURCES
 
 #include <gprt.h>
+// #include <gdt/math/mat.h>
 #include "deviceCode.h"
 #include <GLFW/glfw3.h>
 
@@ -53,12 +54,32 @@ struct VulkanResources {
 
     // Volume
     struct GeometryVolume{
-        GPRTGeomOf<AABBGeomData> aabbGeom;
+        GPRTGeomOf<VolumesGeomData> aabbGeom;
         GPRTAccel aabbBLAS;
+        VolumesGeomData *volumeData;
+
+        // gdt::affine3f matrix;
+        float2 volume_value_range;
+        float volume_scale;
+
+        // tfn
+        std::vector<float4> tfn_colors_data;
+        std::vector<float>  tfn_opacity_data;
+        float2 tfn_value_range;
+        float tfn_range_rcp_norm;
 
         GPRTBufferOf<float3> aabbPositionsBuffer;
+        GPRTBufferOf<float> volumeBuffer;
+        GPRTBufferOf<float4> tfnColorBuffer;
+        GPRTBufferOf<float> tfnOpacityBuffer;
+        GPRTBufferOf<float2> tfnValueRangeBuffer;
+
+        GPRTBufferOf<int3> volumeSizeBuffer;
+        GPRTBufferOf<int> tfnColorSizeBuffer;
+        GPRTBufferOf<int> tfnOpacitySizeBuffer;
     };
     std::vector<GeometryVolume> listOfGeometryVolume;
+    GeometryVolume trashGeometryVolume;
 
     // General
     GPRTContext context;
@@ -78,7 +99,7 @@ struct VulkanResources {
 
     // Generate
     GPRTGeomTypeOf<TrianglesGeomData> trianglesGeomType;
-    GPRTGeomTypeOf<AABBGeomData> aabbGeomType;
+    GPRTGeomTypeOf<VolumesGeomData> aabbGeomType;
     GPRTMissOf<MissProgData> miss;
     GPRTRayGenOf<RayGenData> rayGen;
 

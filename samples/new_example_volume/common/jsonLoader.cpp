@@ -1,5 +1,5 @@
 #include "jsonLoader.hpp"
-
+#include <float.h>
 std::string check_valid_extension(std::string filename)
 {
   const auto ext = filename.substr(filename.find_last_of(".") + 1);
@@ -238,6 +238,16 @@ void create_scene_tfn(const json& jsview, Volume &volume)
   }
 }
 
+void create_scene_camera(const json& jsview, Volume &volume)
+{
+  const auto& jscamera = jsview[CAMERA];
+
+  volume.camera.from = scalar_from_json<float3>(jscamera[EYE]);
+  volume.camera.at = scalar_from_json<float3>(jscamera[CENTER]);
+  volume.camera.up = scalar_from_json<float3>(jscamera[UP]);
+  volume.camera.perspective_fovy = jscamera[FOVY].get<float>();
+}
+
 void load_volume_data_from_file(Volume &volume)
 {
     // Open JSON File
@@ -262,5 +272,32 @@ void load_volume_data_from_file(Volume &volume)
           }
         }
       }
+      create_scene_camera(root[VIEW], volume);
     }
+}
+
+float2 get_volume_value_range(array_3d_scalar_t data)
+{
+  size_t size = data->dims.long_product();
+  float* idata = (float*)data->data();
+
+  float min_value = FLT_MAX;
+  float max_value = FLT_MIN;
+  // Can use TBB to load data faster
+  for (int i = 0; i < size; i++) {
+    float data_point = idata[i];
+
+    if (data_point > max_value) {
+      max_value = data_point;
+    }
+
+    if (data_point < min_value) {
+      min_value = data_point;
+    }
+  }
+
+  std::cout << max_value << std::endl;
+  std::cout << min_value << std::endl;
+
+  return float2(min_value, max_value);
 }

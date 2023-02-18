@@ -666,7 +666,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 //
 // Instead, we pass data through a customizable Attributes structure
 // for further processing by closest hit / any hit programs.
-GPRT_INTERSECTION_PROGRAM(AABBIntersection, (AABBGeomData, record))
+GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
 {
   Attributes attr;
   attr.color = float3(1.f, 1.f, 1.f);
@@ -683,7 +683,7 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (AABBGeomData, record))
 //
 // Also note, this program is also called after all ReportHit's have been
 // called and we can conclude which reported hit is closest.
-GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (AABBGeomData, record), (Payload, payload), (Attributes, attributes))
+GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
   payload.color = attributes.color;
   ScatterResult result;

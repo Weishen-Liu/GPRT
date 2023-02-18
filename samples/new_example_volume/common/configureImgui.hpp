@@ -51,6 +51,17 @@ struct TransferFunction {
 };
 
 struct Volume {
+    struct Camera {
+        float3 from = float3(0.f, 0.f, 0.f);
+
+        float3 position{0, -1, 0};
+        float3 at;
+
+        float3 upVector{0, 1, 0};
+        float3 up;
+        float  perspective_fovy;
+    } camera;
+
     std::string name;
     std::string path;
     float3 grid_origin  = float3(0.f, 0.f, 0.f);
@@ -62,6 +73,7 @@ struct Volume {
     int SELECTED_VOLUME_INSTANCE = 0;
     int instanceUniqueName = 0;
     float3 defaultTransform = float3(0.f, 0.f, 0.f);
+    float3 aabbPositions[2] = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
 };
 
 struct LoadInObj {
@@ -118,7 +130,6 @@ struct ConfigureImgui {
     int SELECTED_LIGHTS = 0;
 
     // The extents of our bounding box
-    float3 aabbPositions[2] = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
     std::vector<LoadInVolume*> INITIAL_VOLUME = {
         new LoadInVolume("Mechanic Hand", "/media/storage0/weishen/GPRT-1/samples/new_example_volume/volumes/scene_mechhand.json")
     };

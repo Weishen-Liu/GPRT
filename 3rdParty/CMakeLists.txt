@@ -99,6 +99,7 @@ ENDIF()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/gdt/cmake")
 include(configure_build_type)
 include_directories(${CMAKE_CURRENT_LIST_DIR}/gdt)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/gdt/..)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/gdt EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------

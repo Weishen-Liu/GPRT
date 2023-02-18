@@ -17,10 +17,15 @@ struct Viewer
 {
     ArcBall arcball;
     // Camera
-    float3 lookFrom = {0.f, 10.f, 10.f};
-    float3 lookAt = {0.f, 0.f, 0.f};
-    float3 lookUp = {0.f, 1.f, 0.f};
-    float cosFovy = 20.f;
+    // float3 lookFrom = {859.473f,1237.86f,-461.905f};
+    // float3 lookFrom = {30.8481f,233.84f,-1558.48f};
+    float3 lookFrom = {0.f, 4.f, 0.f};
+    float3 lookAt = {0.f,0.f,0.f};
+    float3 lookUp = {-0.0104937f,-0.423393f,-0.905885f};
+    // float3 lookFrom = float3(288.962f, 70.1202f, 121.871f);
+    // float3 lookAt = float3(423.f, 295.f, 105.f);
+    // float3 lookUp = float3(0.38687627268161939f, 0.84789666508123507f, -0.36248861358682333f);
+    float cosFovy = 45.f;
     Camera camera;
 
     GLFWwindow *handle{nullptr};
@@ -40,7 +45,7 @@ struct Viewer
     GLuint fbTexture{0};
 
     const float degrees_per_drag_fraction = 150;
-    const float pixels_per_move = 10.f;
+    const float pixels_per_move = 200.f;
     bool pressed = false;
     float maxDistance = std::numeric_limits<float>::infinity();
     float minDistance = 1e-3f;
