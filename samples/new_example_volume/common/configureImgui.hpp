@@ -137,6 +137,7 @@ struct ConfigureImgui {
     // The extents of our bounding box
     std::vector<LoadInVolume*> INITIAL_VOLUME = {
         new LoadInVolume("Mechanic Hand", "/media/storage0/weishen/GPRT-1/samples/new_example_volume/volumes/scene_mechhand.json")
+        // ,new LoadInVolume("Heatrelease", "/media/storage0/weishen/GPRT-1/samples/new_example_volume/volumes/generated_heatrelease_1atm_camera_adjusted.json")
     };
     std::vector<Volume> LIST_OF_VOLUMES;
     int SELECTED_VOLUMES = 0;

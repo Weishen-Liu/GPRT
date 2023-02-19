@@ -166,19 +166,6 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
       if (dot(lastScatterResult.normal, rayDesc.Direction) <= 0) {
         continue;
       }
-      TraceRay(
-        world, // the tree
-        RAY_FLAG_FORCE_OPAQUE, // ray flags
-        0xff, // instance inclusion mask
-        0, // ray type
-        1, // number of ray types
-        0, // miss type
-        rayDesc, // the ray to trace
-        payload // the payload IO
-      );
-      if (payload.scatterResult.scatterEvent == 2) {
-        total_lights_color += directionalLightIntensity * attenuation;
-      }
     }
     // Volume
     else {
@@ -193,9 +180,28 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
         payload // the payload IO
       );
       if (payload.scatterResult.scatterEvent == 0) {
-        total_lights_color += directionalLightIntensity * attenuation;
+        // attenuation *= payload.scatterResult.attenuation;
+        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+        rayDesc.Direction = payload.scatterResult.scatteredDirection;
+        payload.rand = payload.scatterResult.rand;
+      }else {
+        continue;
       }
-    } 
+    }
+
+    TraceRay(
+      world, // the tree
+      RAY_FLAG_FORCE_OPAQUE, // ray flags
+      0xff, // instance inclusion mask
+      0, // ray type
+      1, // number of ray types
+      0, // miss type
+      rayDesc, // the ray to trace
+      payload // the payload IO
+    );
+    if (payload.scatterResult.scatterEvent == 2) {
+      total_lights_color += directionalLightIntensity * attenuation;
+    }
   }
 
   return total_lights_color;
@@ -464,6 +470,9 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
   // If not hit by delta tracking, return
   if (!result.volume_hit) {
     result.scatterEvent        = 0;
+    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.volume_t;
+    result.scatteredDirection  = WorldRayDirection();
+    result.isObj               = false;
   }
   // If hit by delta tracking, sample random direction
   else {
@@ -487,6 +496,7 @@ GPRT_MISS_PROGRAM(miss, (MissProgData, record), (Payload, payload))
   payload.color = float3(0.f, 0.f, 0.f);
 
   ScatterResult result;
-  result.scatterEvent = 2;
+  result.scatterEvent   = 2;
+  result.isObj          = false;
   payload.scatterResult = result;
 }
