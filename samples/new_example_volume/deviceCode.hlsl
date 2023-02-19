@@ -243,6 +243,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
 
     float3 attenuation = float3(1.f, 1.f, 1.f);
     ScatterResult lastScatterResult;
+    bool atLeastOneHit = false;
     for (int i = 0; i < RAY_DEPTH; i++) {
       TraceRay(
         world, // the tree
@@ -260,18 +261,19 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         // total_payload_color += payload.color * attenuation;
         // total_payload_color = float3(1.f, 0.f, 0.f);
 
-        // if (i > 0) {
-        //   total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
-        //   // total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
-        // }
-        break;
-      } else if (payload.scatterResult.scatterEvent == 0) { // Leave AABB
         if (i > 0) {
-          // total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
-          total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+          if (atLeastOneHit) {
+            // total_payload_color += float3(1.f, 1.f, 1.f) * attenuation;
+            total_payload_color += direct_lighting(world, record, lastScatterResult, attenuation);
+          }
         }
         break;
+      } else if (payload.scatterResult.scatterEvent == 0) { // Leave AABB
+        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+        rayDesc.Direction = payload.scatterResult.scatteredDirection;
+        payload.rand = payload.scatterResult.rand;
       } else {
+        atLeastOneHit = true;
         attenuation *= payload.scatterResult.attenuation;
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
