@@ -29,6 +29,8 @@
 struct VolumesGeomData {
   alignas(16) gprt::Buffer aabb_position;
   alignas(16) gprt::Buffer volume;          // float3
+  /*! base color texture we use for the entire mesh */
+  alignas(16) gprt::Texture volume_in_texture;
   alignas(16) gprt::Buffer tfn_color;       // float4
   alignas(16) gprt::Buffer tfn_opacity;     // float
   alignas(16) gprt::Buffer tfn_value_range; // float2
