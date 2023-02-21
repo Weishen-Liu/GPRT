@@ -34,3 +34,4 @@ add_subdirectory(s10-rasterization)
 
 add_subdirectory(new_example)
 add_subdirectory(new_example_volume)
+add_subdirectory(new_example_volume_with_texture)

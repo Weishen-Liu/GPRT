@@ -495,8 +495,12 @@ void VulkanResources::destoryVulkanResources() {
     gprtBufferDestroy(frameBuffer);
     gprtBufferDestroy(accBuffer);
 
-    gprtBufferDestroy(transformObjBuffer);
-    gprtBufferDestroy(transformVolumeBuffer);
+    if (transformsObj.size()) {
+        gprtBufferDestroy(transformObjBuffer);
+    }
+    if (transformsVolume.size()) {
+        gprtBufferDestroy(transformVolumeBuffer);
+    }
     for (auto &eachGeo: listOfGeometryVolume) 
     {
         gprtBufferDestroy(eachGeo.aabbPositionsBuffer);
