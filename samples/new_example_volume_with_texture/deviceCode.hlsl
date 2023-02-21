@@ -378,15 +378,21 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
   }
 }
 
-float sample_volume_object_space(VolumesGeomData record, float3 p)
+float sample_volume_object_space(VolumesGeomData record, float3 p, inout RandSeed rand)
 {
   // calculate with volume
   int3 volume_size = gprt::load<int3>(record.volume_size_buffer, 0);
   int volume_size_long_product = volume_size.x * volume_size.y * volume_size.z;
 
   // Texture
+  rand = rand_generate(rand, 3);
+  float3 new_gen = rand.random_number_3;
+  new_gen.x = clamp(new_gen.x, 0, 1);
+  new_gen.y = clamp(new_gen.y, 0, 1);
+  new_gen.z = clamp(new_gen.z, 0, 1);
+
   Texture3D texture = gprt::getTexture3DHandle(record.volume);
-  return texture[p];
+  return texture[p + new_gen];
 } 
 
 float4 sample_transfer_function(VolumesGeomData record, float sample_point)
@@ -426,7 +432,7 @@ ScatterResult delta_tracking(VolumesGeomData record, Payload payload, float3 ray
       break;
     }
 
-    float sample_point = sample_volume_object_space(record, rayOrg + rayDir * t); //Current is world space
+    float sample_point = sample_volume_object_space(record, rayOrg + rayDir * t, result.rand); //Current is world space
     float4 rgba = sample_transfer_function(record, sample_point);
     albedo = float3(rgba.x, rgba.y, rgba.z);
     float mu_t = density_scale * rgba.w;
