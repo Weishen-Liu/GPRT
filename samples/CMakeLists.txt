@@ -36,3 +36,5 @@ add_subdirectory(s11-imgui)
 add_subdirectory(new_example)
 add_subdirectory(new_example_volume)
 add_subdirectory(new_example_volume_with_texture)
+add_subdirectory(new_example_combine_volume_and_geometry)
+
