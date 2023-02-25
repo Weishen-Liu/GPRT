@@ -75,13 +75,13 @@ void VulkanResources::createGeometry(Obj &obj) {
         geometry.list_of_vertex_normals
     );
     geometry.vertexBuffer = gprtDeviceBufferCreate<float3>(
-        context, geometry.list_of_vertices.size(), static_cast<const void *>(geometry.list_of_vertices.data()));
+        context, geometry.list_of_vertices.size(), geometry.list_of_vertices.data());
     geometry.indexBuffer = gprtDeviceBufferCreate<int3>(
-        context, geometry.list_of_indices.size(), static_cast<const void *>(geometry.list_of_indices.data()));
+        context, geometry.list_of_indices.size(), geometry.list_of_indices.data());
     geometry.normalBuffer = gprtDeviceBufferCreate<float3>(
-        context, geometry.list_of_vertex_normals.size(), static_cast<const void *>(geometry.list_of_vertex_normals.data()));
+        context, geometry.list_of_vertex_normals.size(), geometry.list_of_vertex_normals.data());
     geometry.colorBuffer = gprtDeviceBufferCreate<float3>(
-        context, geometry.list_of_colors.size(), static_cast<const void *>(geometry.list_of_colors.data()));
+        context, geometry.list_of_colors.size(), geometry.list_of_colors.data());
 
     geometry.geomData = gprtGeomGetParameters(geometry.trianglesGeom);
     geometry.geomData->vertex = gprtBufferGetHandle(geometry.vertexBuffer);
@@ -106,7 +106,7 @@ void VulkanResources::createVolume(Volume &volume) {
     // Create our AABB geometry. Every AABB is defined using two float3's. The
     // first float3 defines the bottom lower left near corner, and the second
     // float3 defines the upper far right corner.
-    newGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, static_cast<const void *>(volume.aabbPositions));
+    newGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, volume.aabbPositions);
     newGeometryVolume.aabbGeom = gprtGeomCreate<VolumesGeomData>(context, aabbGeomType);
     gprtAABBsSetPositions(newGeometryVolume.aabbGeom, newGeometryVolume.aabbPositionsBuffer, 1 /* just one aabb */);
 
@@ -134,8 +134,8 @@ void VulkanResources::createVolume(Volume &volume) {
         newGeometryVolume.tfn_opacity_data[i] = ((float*)volume.transferFunction.opacity->data())[2 * i + 1];
     }
 
-    newGeometryVolume.tfnColorBuffer = gprtDeviceBufferCreate<float4>(context, tfn_color_size, static_cast<const void *>(volume.transferFunction.color->data()));
-    newGeometryVolume.tfnOpacityBuffer = gprtDeviceBufferCreate<float>(context, tfn_opacity_size, static_cast<const void *>(newGeometryVolume.tfn_opacity_data.data()));
+    newGeometryVolume.tfnColorBuffer = gprtDeviceBufferCreate<float4>(context, tfn_color_size, (float4*)volume.transferFunction.color->data());
+    newGeometryVolume.tfnOpacityBuffer = gprtDeviceBufferCreate<float>(context, tfn_opacity_size, newGeometryVolume.tfn_opacity_data.data());
     newGeometryVolume.tfnValueRangeBuffer = gprtDeviceBufferCreate<float2>(context, 1, &newGeometryVolume.tfn_value_range);
 
     newGeometryVolume.volumeData = gprtGeomGetParameters(newGeometryVolume.aabbGeom);
@@ -153,7 +153,7 @@ void VulkanResources::createVolume(Volume &volume) {
     // newGeometryVolume.volumeData->tfn_color_size = tfn_color_size;
     // newGeometryVolume.volumeData->tfn_opacity_size = tfn_opacity_size;
 
-    newGeometryVolume.volumeSizeBuffer = gprtDeviceBufferCreate<int3>(context, 1, &volume.data->dims);
+    newGeometryVolume.volumeSizeBuffer = gprtDeviceBufferCreate<int3>(context, 1, (int3*)&volume.data->dims);
     newGeometryVolume.tfnColorSizeBuffer = gprtDeviceBufferCreate<int>(context, 1, &tfn_color_size);
     newGeometryVolume.tfnOpacitySizeBuffer = gprtDeviceBufferCreate<int>(context, 1, &tfn_opacity_size);
     newGeometryVolume.volumeData->volume_size_buffer = gprtBufferGetHandle(newGeometryVolume.volumeSizeBuffer);
@@ -178,15 +178,15 @@ void VulkanResources::updateGeometryMaterial(Geometry &geometry, Obj &obj)
     );
 
     geometry.materialTypeBuffer = gprtDeviceBufferCreate<int>(
-        context, 1, static_cast<const void *>(&geometry.obj_material_type));
+        context, 1, &geometry.obj_material_type);
     geometry.lambertianBuffer = gprtDeviceBufferCreate<float3>(
-        context, 1, static_cast<const void *>(&geometry.lambertian_albedo));
+        context, 1, &geometry.lambertian_albedo);
     geometry.metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(
-        context, 1, static_cast<const void *>(&geometry.metal_albedo));
+        context, 1, &geometry.metal_albedo);
     geometry.metalFuzzBuffer = gprtDeviceBufferCreate<float>(
-        context, 1, static_cast<const void *>(&geometry.metal_fuzz));
+        context, 1, &geometry.metal_fuzz);
     geometry.dielectricBuffer = gprtDeviceBufferCreate<float>(
-        context, 1, static_cast<const void *>(&geometry.dielectric_ref_idx));
+        context, 1, &geometry.dielectric_ref_idx);
 
     geometry.geomData->material.type               = (uint64_t)geometry.obj_material_type;
     geometry.geomData->material.metal_albedo       = geometry.metal_albedo;
@@ -205,15 +205,15 @@ void VulkanResources::updateGeometryMaterial(Geometry &geometry, Obj &obj)
     // );
 
     // geometry.materialTypeBuffer = gprtDeviceBufferCreate<int>(
-    //     context, geometry.list_of_material_type.size(), static_cast<const void *>(geometry.list_of_material_type.data()));
+    //     context, geometry.list_of_material_type.size(), geometry.list_of_material_type.data());
     // geometry.lambertianBuffer = gprtDeviceBufferCreate<float3>(
-    //     context, geometry.list_of_lambertians.size(), static_cast<const void *>(geometry.list_of_lambertians.data()));
+    //     context, geometry.list_of_lambertians.size(), geometry.list_of_lambertians.data());
     // geometry.metalAlbedoBuffer = gprtDeviceBufferCreate<float3>(
-    //     context, geometry.list_of_metals_albedo.size(), static_cast<const void *>(geometry.list_of_metals_albedo.data()));
+    //     context, geometry.list_of_metals_albedo.size(), geometry.list_of_metals_albedo.data());
     // geometry.metalFuzzBuffer = gprtDeviceBufferCreate<float>(
-    //     context, geometry.list_of_metals_fuzz.size(), static_cast<const void *>(geometry.list_of_metals_fuzz.data()));
+    //     context, geometry.list_of_metals_fuzz.size(), geometry.list_of_metals_fuzz.data());
     // geometry.dielectricBuffer = gprtDeviceBufferCreate<float>(
-    //     context, geometry.list_of_dielectrics.size(), static_cast<const void *>(geometry.list_of_dielectrics.data()));
+    //     context, geometry.list_of_dielectrics.size(), geometry.list_of_dielectrics.data());
 
     geometry.geomData->material_type = gprtBufferGetHandle(geometry.materialTypeBuffer);
     geometry.geomData->metal_albedo  = gprtBufferGetHandle(geometry.metalAlbedoBuffer);
@@ -326,7 +326,7 @@ void VulkanResources::updateVulkanResources() {
     }
     // Create Trash Volume Geometry for 0 TLAS Buffer
     trashGeometryVolume = listOfGeometryVolume[0];
-    trashGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, static_cast<const void *>(emptyAABB));
+    trashGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, emptyAABB);
     gprtAABBsSetPositions(trashGeometryVolume.aabbGeom, trashGeometryVolume.aabbPositionsBuffer, 1 /* just one aabb */);
     trashGeometryVolume.aabbBLAS = gprtAABBAccelCreate(context, 1, &trashGeometryVolume.aabbGeom);
     gprtAccelBuild(context, trashGeometryVolume.aabbBLAS);
@@ -448,16 +448,16 @@ void VulkanResources::updateLights() {
 
     if (list_of_ambient_lights_intensity.size() > 0) {
         ambientLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
-        context, list_of_ambient_lights_intensity.size(), static_cast<const void *>(list_of_ambient_lights_intensity.data()));
+        context, list_of_ambient_lights_intensity.size(), list_of_ambient_lights_intensity.data());
 
         rayGenData->ambient_lights_intensity = gprtBufferGetHandle(ambientLightIntensityBuffer);
     }
 
     if (list_of_directional_lights_intensity.size() > 0) {
         directionalLightIntensityBuffer = gprtDeviceBufferCreate<float3>(
-            context, list_of_directional_lights_intensity.size(), static_cast<const void *>(list_of_directional_lights_intensity.data()));
+            context, list_of_directional_lights_intensity.size(), list_of_directional_lights_intensity.data());
         directionalLightDirBuffer = gprtDeviceBufferCreate<float3>(
-            context, list_of_directional_lights_direction.size(), static_cast<const void *>(list_of_directional_lights_direction.data()));
+            context, list_of_directional_lights_direction.size(), list_of_directional_lights_direction.data());
 
         rayGenData->directional_lights_intensity = gprtBufferGetHandle(directionalLightIntensityBuffer);
         rayGenData->directional_lights_dir = gprtBufferGetHandle(directionalLightDirBuffer);
