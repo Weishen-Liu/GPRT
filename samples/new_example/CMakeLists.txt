@@ -39,6 +39,5 @@ target_link_libraries(new_example
     glfw
     tiny_obj_loader
     stb_image
-    imgui-1
     ${OPENGL_gl_LIBRARY}
 )

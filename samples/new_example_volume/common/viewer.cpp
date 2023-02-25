@@ -1,8 +1,8 @@
 #include "./viewer.hpp"
 
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_opengl2.h>
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl2.h"
 
 #ifndef M_PI
 #define M_PI 3.1415926f

@@ -116,7 +116,7 @@ target_include_directories(tfnmodule PUBLIC
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/stb_image EXCLUDE_FROM_ALL)
 
 # Find ImGUi
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
+# add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/imgui EXCLUDE_FROM_ALL)
 
 # Find OBJ file loader
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tiny_obj_loader EXCLUDE_FROM_ALL)
@@ -149,7 +149,8 @@ add_library(imgui
   ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp
 
   ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_opengl2.cpp)
 
 target_include_directories(imgui PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
