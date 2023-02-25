@@ -385,14 +385,20 @@ float sample_volume_object_space(VolumesGeomData record, float3 p, inout RandSee
   int volume_size_long_product = volume_size.x * volume_size.y * volume_size.z;
 
   // Texture
-  rand = rand_generate(rand, 3);
-  float3 new_gen = rand.random_number_3;
-  new_gen.x = clamp(new_gen.x, 0, 1);
-  new_gen.y = clamp(new_gen.y, 0, 1);
-  new_gen.z = clamp(new_gen.z, 0, 1);
-
   Texture3D texture = gprt::getTexture3DHandle(record.volume);
-  return texture[p + new_gen];
+  SamplerState sampler = gprt::getSamplerHandle(record.samplers[0]);
+  p.x = (p.x + 0.5) / volume_size.x;
+  p.y = (p.y + 0.5) / volume_size.y;
+  p.z = (p.z + 0.5) / volume_size.z;
+
+  return texture.SampleLevel(sampler, p, 0);
+
+  // rand = rand_generate(rand, 3);
+  // float3 new_gen = rand.random_number_3;
+  // new_gen.x = clamp(new_gen.x, 0, 1);
+  // new_gen.y = clamp(new_gen.y, 0, 1);
+  // new_gen.z = clamp(new_gen.z, 0, 1);
+  // return texture[p + new_gen];
 } 
 
 float4 sample_transfer_function(VolumesGeomData record, float sample_point)
@@ -463,8 +469,8 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
   ScatterResult result;
   float3 rayOrg = ObjectRayOrigin();
   float3 rayDir = ObjectRayDirection();
-  // rayOrg = WorldRayOrigin();
-  // rayDir = WorldRayDirection();
+  rayOrg = WorldRayOrigin();
+  rayDir = WorldRayDirection();
   
   // See if delta tracking returns hit
   result = delta_tracking(record, payload, rayOrg, rayDir, attributes.t_min, attributes.t_max);

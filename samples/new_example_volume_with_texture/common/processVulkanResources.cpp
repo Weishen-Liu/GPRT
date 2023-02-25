@@ -122,9 +122,7 @@ void VulkanResources::createVolume(Volume &volume) {
 
     newGeometryVolume.textureBuffer = gprtDeviceTextureCreate<float>(context, GPRT_IMAGE_TYPE_3D, GPRT_FORMAT_D32_SFLOAT, volume.data->dims.x, volume.data->dims.y, volume.data->dims.z, /* generate mipmaps */ true, (float*)(volume.data->data()));
 
-    newGeometryVolume.samplers.push_back(gprtSamplerCreate(context));
-    newGeometryVolume.samplers.push_back(gprtSamplerCreate(context, GPRT_FILTER_NEAREST));
-    // newGeometryVolume.samplers.push_back(gprtSamplerCreate(context, GPRT_FILTER_LINEAR));
+    newGeometryVolume.samplers.push_back(gprtSamplerCreate(context, GPRT_FILTER_LINEAR));
 
     newGeometryVolume.volume_scale = 1.f / (value_range.y - value_range.x);
     newGeometryVolume.tfn_value_range.x = value_range.x;
@@ -427,6 +425,11 @@ void VulkanResources::createVolumeAccel() {
     // triangle and AABB accels can be combined in a top level tree
     gprtAccelBuild(context, aabbTLAS);
 }
+
+/*
+Volume list of BLAS + Object list of BLAS -> TLAS
+
+*/
 
 void VulkanResources::createMiss() {
     // ----------- set variables  ----------------------------
