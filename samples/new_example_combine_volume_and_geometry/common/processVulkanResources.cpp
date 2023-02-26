@@ -244,18 +244,6 @@ void VulkanResources::buildSBT()
     gprtBuildShaderBindingTable(context, GPRT_SBT_ALL);
 }
 
-void VulkanResources::refreshObj()
-{
-    listOfTrianglesBLAS = {};
-    transformsObj = {};
-
-    std::cout<<"Accel"<<std::endl;
-    createAccel();
-    rayGenData->triangleWorld = gprtAccelGetHandle(trianglesTLAS);
-    rayGenData->accId = (uint64_t)configureImgui.accId;
-    buildSBT();
-}
-
 void VulkanResources::refreshObjMaterial()
 {
     for (int each_path = 0; each_path < configureImgui.LIST_OF_OBJS.size(); each_path++)
@@ -263,17 +251,22 @@ void VulkanResources::refreshObjMaterial()
         updateGeometryMaterial(listOfGeometry[each_path], configureImgui.LIST_OF_OBJS[each_path]);
     }
 
-    refreshObj();
+    refreshObjAndVolume();
 }
 
-void VulkanResources::refreshVolume()
+void VulkanResources::refreshObjAndVolume()
 {
     listOfVolumesBLAS = {};
     transformsVolume = {};
+    listOfTrianglesBLAS = {};
+    transformsObj = {};
+    listOfObjAndVolumesBLAS = {};
+    transformsObjAndVolume = {};
+    masksForObjAndVolume = {};
 
     std::cout<<"Accel"<<std::endl;
-    createVolumeAccel();
-    rayGenData->world = gprtAccelGetHandle(aabbTLAS);
+    createVolumeAndGeometryAccel();
+    rayGenData->world = gprtAccelGetHandle(objAndVolumeTLAS);
     rayGenData->accId = (uint64_t)configureImgui.accId;
     buildSBT();
 }
@@ -314,16 +307,8 @@ void VulkanResources::updateVulkanResources() {
     for (auto &each_volume : configureImgui.LIST_OF_VOLUMES)
     {
         createVolume(each_volume);
-
-        // if (each_volume.instances.size() == 0) {
-        //     Instance instance;
-        //     instance.name = each_volume.name + " " +std::to_string(each_volume.instanceUniqueName);
-        //     each_volume.instanceUniqueName++;
-        //     instance.transform = each_volume.defaultTransform;
-        //     instance.choosed = true;
-        //     each_volume.instances.push_back(instance);
-        // }
     }
+
     // Create Trash Volume Geometry for 0 TLAS Buffer
     trashGeometryVolume = listOfGeometryVolume[0];
     trashGeometryVolume.aabbPositionsBuffer = gprtDeviceBufferCreate<float3>(context, 2, emptyAABB);
@@ -335,8 +320,7 @@ void VulkanResources::updateVulkanResources() {
     // the group/accel for that mesh
     // ------------------------------------------------------------------
     std::cout<<"Accel"<<std::endl;
-    createAccel();
-    createVolumeAccel();
+    createVolumeAndGeometryAccel();
 
     // ##################################################################
     // set miss and raygen program required for SBT
@@ -354,6 +338,7 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
     // gprtRequestWindow(configureImgui.fbSize.x, configureImgui.fbSize.y, "New Example");
     context = gprtContextCreate(nullptr, 1);
     module = gprtModuleCreate(context, new_example_deviceCode);
+    // gprtRequestRayTypeCount(2);
 
     trianglesGeomType = gprtGeomTypeCreate<TrianglesGeomData>(context, GPRT_TRIANGLES);
     gprtGeomTypeSetClosestHitProg(trianglesGeomType, 0, module, "TriangleMesh");
@@ -373,7 +358,7 @@ void VulkanResources::initialVulkanResources(GPRTProgram new_example_deviceCode)
     gprtBuildShaderBindingTable(context);
 }
 
-void VulkanResources::createAccel() {
+void VulkanResources::createVolumeAndGeometryAccel() {
     for (int i = 0; i < configureImgui.LIST_OF_OBJS.size(); i++)
     {
         for (auto &eachInstance: configureImgui.LIST_OF_OBJS[i].instances)
@@ -386,50 +371,49 @@ void VulkanResources::createAccel() {
         }
     }
 
-    if (transformsObj.size() > 0) {
-        trianglesTLAS = gprtInstanceAccelCreate(context, listOfTrianglesBLAS.size(), listOfTrianglesBLAS.data());
-
-        transformObjBuffer = gprtDeviceBufferCreate<float4x4>(context, transformsObj.size(), transformsObj.data());
-        gprtInstanceAccelSet4x4Transforms(trianglesTLAS, transformObjBuffer);
-    }
-    else {
-        trianglesTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometry.trianglesBLAS);
-    }
-    gprtAccelBuild(context, trianglesTLAS);
-}
-
-void VulkanResources::createVolumeAccel() {
-    std::cout<< "LIST_OF_VOLUMES.size(): " << configureImgui.LIST_OF_VOLUMES.size() << std::endl;
     for (int i = 0; i < configureImgui.LIST_OF_VOLUMES.size(); i++)
     {
-        std::cout<< "instances.size(): " << configureImgui.LIST_OF_VOLUMES[i].instances.size() << std::endl;
         for (auto &eachInstance: configureImgui.LIST_OF_VOLUMES[i].instances)
         {
             if (eachInstance.choosed)
             {
-                std::cout<< "Found Chooses Instance" << std::endl;
                 listOfVolumesBLAS.push_back(listOfGeometryVolume[i].aabbBLAS);
                 transformsVolume.push_back(transpose(translation_matrix(eachInstance.transform)));
             }
         }
     }
 
-    if (transformsVolume.size() > 0) {
-        aabbTLAS = gprtInstanceAccelCreate(context, listOfVolumesBLAS.size(), listOfVolumesBLAS.data());
-
-        transformVolumeBuffer = gprtDeviceBufferCreate<float4x4>(context, transformsVolume.size(), transformsVolume.data());
-        gprtInstanceAccelSet4x4Transforms(aabbTLAS, transformVolumeBuffer);
-    } else {
-        aabbTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometryVolume.aabbBLAS);
+    if (transformsObj.size() > 0) {
+        for (auto& eachTriangleBLAS: listOfTrianglesBLAS) {
+            listOfObjAndVolumesBLAS.push_back(eachTriangleBLAS);
+            masksForObjAndVolume.push_back(maskTypes[0]);
+        }
+        for (auto& eachTriangleTransform: transformsObj) {
+            transformsObjAndVolume.push_back(eachTriangleTransform);
+        }
     }
-    // triangle and AABB accels can be combined in a top level tree
-    gprtAccelBuild(context, aabbTLAS);
+
+    if (transformsVolume.size() > 0) {
+        for (auto& eachVolumeBLAS: listOfVolumesBLAS) {
+            listOfObjAndVolumesBLAS.push_back(eachVolumeBLAS);
+            masksForObjAndVolume.push_back(maskTypes[1]);
+        }
+        for (auto& eachVolumeTransform: transformsVolume) {
+            transformsObjAndVolume.push_back(eachVolumeTransform);
+        }
+    }
+
+    if (listOfObjAndVolumesBLAS.size() > 0) {
+        objAndVolumeTLAS = gprtInstanceAccelCreate(context, listOfObjAndVolumesBLAS.size(), listOfObjAndVolumesBLAS.data());
+        transformObjAndVolumeBuffer = gprtDeviceBufferCreate<float4x4>(context, transformsObjAndVolume.size(), transformsObjAndVolume.data());
+        gprtInstanceAccelSet4x4Transforms(objAndVolumeTLAS, transformObjAndVolumeBuffer);
+        masksBuffer = gprtDeviceBufferCreate<uint32_t>(context, masksForObjAndVolume.size(), masksForObjAndVolume.data());
+        gprtInstanceAccelSetVisibilityMasks(objAndVolumeTLAS, masksBuffer);
+    } else {
+        objAndVolumeTLAS = gprtInstanceAccelCreate(context, 1, &trashGeometry.trianglesBLAS);
+    }
+    gprtAccelBuild(context, objAndVolumeTLAS);
 }
-
-/*
-Volume list of BLAS + Object list of BLAS -> TLAS
-
-*/
 
 void VulkanResources::createMiss() {
     // ----------- set variables  ----------------------------
@@ -470,8 +454,7 @@ void VulkanResources::createRayGen() {
     updateLights();
 
     // ----------- set variables  ----------------------------
-    rayGenData->triangleWorld = gprtAccelGetHandle(trianglesTLAS);
-    rayGenData->world = gprtAccelGetHandle(aabbTLAS);
+    rayGenData->world = gprtAccelGetHandle(objAndVolumeTLAS);
     rayGenData->frameBuffer = gprtBufferGetHandle(frameBuffer);
     rayGenData->accBuffer = gprtBufferGetHandle(accBuffer);
     rayGenData->accId = (uint64_t)configureImgui.accId;
@@ -506,11 +489,12 @@ void VulkanResources::destoryVulkanResources() {
     gprtBufferDestroy(frameBuffer);
     gprtBufferDestroy(accBuffer);
 
-    if (transformsObj.size()) {
-        gprtBufferDestroy(transformObjBuffer);
+    if (transformsObjAndVolume.size()) {
+        gprtBufferDestroy(transformObjAndVolumeBuffer);
     }
-    if (transformsVolume.size()) {
-        gprtBufferDestroy(transformVolumeBuffer);
+
+    if (masksForObjAndVolume.size()) {
+        gprtBufferDestroy(masksBuffer);
     }
 
     for (auto &eachGeo: listOfGeometryVolume) 
@@ -529,9 +513,8 @@ void VulkanResources::destoryVulkanResources() {
 
     gprtRayGenDestroy(rayGen);
     gprtMissDestroy(miss);
-    gprtAccelDestroy(trianglesTLAS);
+    gprtAccelDestroy(objAndVolumeTLAS);
     gprtGeomTypeDestroy(trianglesGeomType);
-    gprtAccelDestroy(aabbTLAS);
     gprtGeomTypeDestroy(aabbGeomType);
     gprtModuleDestroy(module);
     gprtContextDestroy(context);

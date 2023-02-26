@@ -314,7 +314,7 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
 
 void ConfigureImgui::updateTransform(Obj& obj)
 {
-    inputAndSlider(obj.instances[obj.current_instance_index].transform, -10.f, 10.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
+    inputAndSlider(obj.instances[obj.current_instance_index].transform, -100000.f, 100000.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
 }
 
 void ConfigureImgui::updateTransform(Volume& volume)

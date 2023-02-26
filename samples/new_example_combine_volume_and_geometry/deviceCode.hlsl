@@ -32,116 +32,18 @@
 #include <gprt.h>
 #endif
 
-#ifndef M_PI
-#define M_PI 3.1415926f
+#ifndef   INCLUDE_MATERIAL
+#define   INCLUDE_MATERIAL
+#include "./common/material.hpp"
+#endif
+
+#ifndef   INCLUDE_SHARE_DEVICE_CODE
+#define   INCLUDE_SHARE_DEVICE_CODE
+#include "shareDeviceCode.hlsl"
 #endif
 
 #define TOTAL_SAMPLE_PER_PIXEL 100
 #define RAY_DEPTH 20
-
-uint rand_init(uint val0, uint val1)
-{
-  uint v0 = val0;
-  uint v1 = val1;
-  uint s0 = 0;
-
-  for (int n = 0; n < 4; n++) {
-    s0 += 0x9e3779b9;
-    v0 += ((v1<<4)+0xa341316c)^(v1+s0)^((v1>>5)+0xc8013ea4);
-    v1 += ((v0<<4)+0xad90777d)^(v0+s0)^((v0>>5)+0x7e95761e);
-  }
-  return v0;
-}
-
-// Generate random unsigned int in [0, 2^24)
-RandSeed rand_generate(RandSeed rand_seed, int number)
-{
-  const uint32_t LCG_A = 1664525u;
-  const uint32_t LCG_C = 1013904223u;
-  float new_random_number_1, new_random_number_2, new_random_number_3;
-  if (number >= 1) {
-    rand_seed.state = (LCG_A * rand_seed.state + LCG_C);
-    new_random_number_1 = ldexp(float(rand_seed.state), -32);
-    rand_seed.random_number = new_random_number_1;
-  } 
-  
-  if (number >= 2) {
-    rand_seed.state = (LCG_A * rand_seed.state + LCG_C);
-    new_random_number_2 = ldexp(float(rand_seed.state), -32);
-    rand_seed.random_number_2 = float2(new_random_number_1, new_random_number_2);
-  }
-  
-  if (number >= 3) {
-    rand_seed.state = (LCG_A * rand_seed.state + LCG_C);
-    new_random_number_3 = ldexp(float(rand_seed.state), -32);
-    rand_seed.random_number_3 = float3(new_random_number_1, new_random_number_2, new_random_number_3);
-  }
-  return rand_seed;
-}
-
-float2 rand_2_10(float2 uv) {
-    float noiseX = (frac(sin(dot(uv, float2(12.9898,78.233) * 2.0)) * 43758.5453));
-    float noiseY = sqrt(1 - noiseX * noiseX);
-    return float2(noiseX, noiseY);
-}
-
-float3 rand_3_10(float2 uv) {
-    float2 noiseXY = rand_2_10(uv);
-    float noiseX = noiseXY.x;
-    float noiseY = noiseXY.y;
-    float noiseZ = rand_2_10(noiseXY).x;
-    return float3(noiseX, noiseY, noiseZ);
-}
-
-RandSeed ramdom_point_in_unit_sphere(RandSeed rand) {
-  rand = rand_generate(rand, 2);
-  float3 p;
-  do {
-    p = 2.0f*rand_3_10(rand.random_number_2) - float3(1, 1, 1);
-    rand = rand_generate(rand, 2);
-  } while (dot(p,p) > 1.0f);
-  rand.random_number_3 = p;
-  return rand;
-}
-
-float3 cartesian(float phi, float sinTheta, float cosTheta)
-{
-  float sinPhi, cosPhi;
-  sinPhi = sin(phi);
-  cosPhi = cos(phi);
-
-  return float3(cosPhi * sinTheta, sinPhi * sinTheta, cosTheta);
-}
-
-float3 uniform_sample_sphere(float radius, float2 s)
-{
-  float phi = 2 * M_PI * s.x;
-  float cosTheta = radius * (1.f - 2.f * s.y);
-  float sinTheta = 2.f * radius * sqrt(s.y * (1.f - s.y));
-  return cartesian(phi, sinTheta, cosTheta);
-}
-
-static RandSeed russian_roulette(int scatter_index, float3 attenuation, RandSeed rand)
-{
-  if (scatter_index > 5) {
-    float q = (.05f < attenuation.y) ? 1 - attenuation.y : .05f;
-
-    rand = rand_generate(rand, 2);
-    float2 compare = rand.random_number_2;
-    if (compare.x > compare.y)
-        rand.random_number_3 = float3(0.f, 0.f, 0.f);
-        return rand;
-    
-    if(1 == q){
-      attenuation = float3(1.f, 1.f, 1.f);
-    }else{
-      attenuation /= 1 - q;
-    }
-    
-  }
-  rand.random_number_3 = attenuation;
-  return rand;
-}
 
 float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record, ScatterResult lastScatterResult, float3 attenuation) {
   float3 total_lights_color = float3(0.f, 0.f, 0.f);
@@ -172,7 +74,7 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
       TraceRay(
         world, // the tree
         RAY_FLAG_FORCE_OPAQUE, // ray flags
-        0xff, // instance inclusion mask
+        0b111111111, // instance inclusion mask
         0, // ray type
         1, // number of ray types
         0, // miss type
@@ -184,7 +86,7 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
         rayDesc.Origin = payload.scatterResult.scatteredOrigin;
         rayDesc.Direction = payload.scatterResult.scatteredDirection;
         payload.rand = payload.scatterResult.rand;
-      }else {
+      } else {
         continue;
       }
     }
@@ -192,7 +94,7 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
     TraceRay(
       world, // the tree
       RAY_FLAG_FORCE_OPAQUE, // ray flags
-      0xff, // instance inclusion mask
+      0b111111111, // instance inclusion mask
       0, // ray type
       1, // number of ray types
       0, // miss type
@@ -207,6 +109,101 @@ float3 direct_lighting(RaytracingAccelerationStructure world, RayGenData record,
   return total_lights_color;
 }
 
+ScatterResult scatter(Metal metal, float3 P, float3 N, Payload payload)
+{
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
+
+  if (dot(N,dir) > 0.f){
+    N = -N;
+  }
+  N = normalize(N);
+  
+  ScatterResult result;
+  result.scatteredOrigin = P;
+  float3 reflected = reflect(normalize(dir),N);
+  result.rand = ramdom_point_in_unit_sphere(payload.rand);
+  result.scatteredDirection = (reflected + metal.fuzz * result.rand.random_number_3);
+  result.attenuation        = metal.albedo;
+  result.scatterEvent       = int(dot(result.scatteredDirection, N) > 0.f);
+  result.normal             = N;
+  return result;
+}
+
+ScatterResult scatter(Lambertian lambertian, float3 P, float3 N, Payload payload)
+{
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
+
+  if (dot(N,dir) > 0.f){
+    N = -N;
+  }
+  N = normalize(N);
+
+  ScatterResult result;
+  result.scatteredOrigin     = P;
+  result.rand = ramdom_point_in_unit_sphere(payload.rand);
+  float3 target = P + (N + result.rand.random_number_3);
+  result.scatteredDirection  = (target-P);
+  result.attenuation         = lambertian.albedo;
+  result.scatterEvent        = 1;
+  result.normal              = N;
+  return result;
+}
+
+ScatterResult scatter(Dielectric dielectric, float3 P, float3 N, Payload payload)
+{
+  ScatterResult result;
+
+  float3 org   = ObjectRayOrigin();
+  float3 dir   = ObjectRayDirection();
+
+  if (dot(N,dir) > 0.f){
+    N = -N;
+  }
+  N = normalize(N);
+
+  float3 outward_normal;
+  float3 reflected = reflect(dir,N);
+  float ni_over_nt;
+  result.attenuation = float3(1.f, 1.f, 1.f); 
+  float3 refracted;
+  float reflect_prob;
+  float cosine;
+  
+  if (dot(dir,N) > 0.f) {
+    outward_normal = -N;
+    ni_over_nt = dielectric.ref_idx;
+    cosine = dot(dir, N);// / vec3f(dir).length();
+    cosine = sqrt(1.f - dielectric.ref_idx*dielectric.ref_idx*(1.f-cosine*cosine));
+  }
+  else {
+    outward_normal = N;
+    ni_over_nt = 1.0 / dielectric.ref_idx;
+    cosine = -dot(dir, N);// / vec3f(dir).length();
+  }
+  float3 new_refracted = refract(dir, outward_normal, ni_over_nt, refracted);
+  if (new_refracted.x != 0.f && new_refracted.y != 0.f && new_refracted.z != 0.f) {
+    reflect_prob = schlick(cosine, dielectric.ref_idx);
+    refracted = new_refracted;
+  }
+  else {
+    reflect_prob = 1.f;
+  }
+
+  result.scatteredOrigin = P;
+  result.rand = ramdom_point_in_unit_sphere(payload.rand);
+  if (result.rand.random_number_3.x < reflect_prob) 
+    result.scatteredDirection = reflected;
+  else 
+    result.scatteredDirection = refracted;
+  
+  // return scattering event
+  result.scatterEvent        = 1;
+  result.normal              = N;
+  return result;
+}
+
 GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, payload), (Attributes, attributes))
 {
   payload.color = float3(0.f, 0.f, 0.f);
@@ -214,6 +211,71 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   result.scatterEvent = 2;
   result.isObj = true;
   payload.scatterResult = result;
+
+  uint   primID = PrimitiveIndex();
+  float3 rayOrg = ObjectRayOrigin();
+  float3 rayDir = ObjectRayDirection();
+  float  tHit   = RayTCurrent();
+  float3 targetPoint = rayOrg + rayDir * tHit;
+
+  // compute normal:
+  int3   index  = gprt::load<int3>(record.index, primID);
+  float3 A      = gprt::load<float3>(record.vertex, index.x);
+  float3 B      = gprt::load<float3>(record.vertex, index.y);
+  float3 C      = gprt::load<float3>(record.vertex, index.z);
+  float3 n_A      = gprt::load<float3>(record.normal, index.x);
+  float3 n_B      = gprt::load<float3>(record.normal, index.y);
+  float3 n_C      = gprt::load<float3>(record.normal, index.z);
+
+  float3 normal;
+
+  if (
+    n_A.x == 0.f && n_A.y == 0.f && n_A.z == 0.f &&
+    n_B.x == 0.f && n_B.y == 0.f && n_B.z == 0.f &&
+    n_C.x == 0.f && n_C.y == 0.f && n_C.z == 0.f
+  ) {
+    normal     = normalize(cross(B-A,C-A));
+  } else {
+    float3 triangle_barycentrics = get_triangle_barycentrics(targetPoint, A, B, C);
+    normal     = triangle_barycentrics.z * n_A + 
+                 triangle_barycentrics.x * n_B + 
+                 triangle_barycentrics.y * n_C;
+  }
+
+  uint instanceID = 0; //InstanceIndex();
+  int material_type = record.material.type;
+  // int material_type = gprt::load<int>(record.material_type, instanceID);
+  // int material_type = gprt::load<int>(record.material_type, primID);
+  if (material_type == 0) {
+    // Lambertian
+    Lambertian lambertian;
+    // lambertian.albedo = float3(record.material.lambertian_albedo);
+    lambertian.albedo = gprt::load<float3>(record.lambertian, instanceID);
+    // lambertian.albedo = gprt::load<float3>(record.lambertian, primID);
+
+    payload.scatterResult = scatter(lambertian, targetPoint, normal, payload);
+  } else if (material_type == 1) {
+    // Metal
+    Metal metal;
+    // metal.albedo = record.material.metal_albedo;
+    // metal.fuzz = record.material.metal_fuzz;
+    metal.albedo = gprt::load<float3>(record.metal_albedo, instanceID);
+    metal.fuzz = gprt::load<float>(record.metal_fuzz, instanceID);
+    // metal.albedo = gprt::load<float3>(record.metal_albedo, primID);
+    // metal.fuzz = gprt::load<float>(record.metal_fuzz, primID);
+    payload.scatterResult = scatter(metal, targetPoint, normal, payload);
+  } else if (material_type == 2) {
+    // Dielectric
+    Dielectric dielectric;
+    // dielectric.ref_idx = record.material.dielectric_ref_idx;
+    dielectric.ref_idx = gprt::load<float>(record.dielectric, instanceID);
+    // dielectric.ref_idx = gprt::load<float>(record.dielectric, primID);
+    payload.scatterResult = scatter(dielectric, targetPoint, normal, payload);
+  }
+  payload.scatterResult.ray_t = tHit;
+  payload.scatterResult.isObj = true;
+  payload.scatterResult.scatteredOrigin = WorldRayOrigin() + WorldRayDirection() * tHit;
+  payload.scatterResult.scatteredDirection = mul(payload.scatterResult.scatteredDirection, (float3x3)ObjectToWorld4x3());
 }
 
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
@@ -248,7 +310,7 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
       TraceRay(
         world, // the tree
         RAY_FLAG_FORCE_OPAQUE, // ray flags
-        0xff, // instance inclusion mask
+        0b111111111, // instance inclusion mask
         0, // ray type
         1, // number of ray types
         0, // miss type
@@ -268,17 +330,93 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
           }
         }
         break;
-      } else if (payload.scatterResult.scatterEvent == 0) { // Leave AABB
-        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
-        rayDesc.Direction = payload.scatterResult.scatteredDirection;
+      } else if (payload.scatterResult.scatterEvent == 0) {
+        if (payload.scatterResult.isObj){
+          break;
+        }
+        float3 leaveAABBOrigin = payload.scatterResult.scatteredOrigin;
+        float3 leaveAABBDirection = payload.scatterResult.scatteredDirection;
         payload.rand = payload.scatterResult.rand;
+
+        // Check if Obj in between
+        rayDesc.TMax = payload.scatterResult.ray_t;
+        TraceRay(
+          world, // the tree
+          RAY_FLAG_FORCE_OPAQUE, // ray flags
+          0b00000001, // instance inclusion mask
+          0, // ray type
+          1, // number of ray types
+          0, // miss type
+          rayDesc, // the ray to trace
+          payload // the payload IO
+        );
+
+        if (payload.scatterResult.scatterEvent == 2) {
+          // No hit obj, continue with previous sampling
+          rayDesc.Origin = leaveAABBOrigin;
+          rayDesc.Direction = leaveAABBDirection;
+        }
+        else if (payload.scatterResult.scatterEvent == 0) {
+          break;
+          rayDesc.Origin = leaveAABBOrigin;
+          rayDesc.Direction = leaveAABBDirection;
+        }
+        else {
+          // Hit Obj
+          attenuation *= payload.scatterResult.attenuation;
+          rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+          rayDesc.Direction = payload.scatterResult.scatteredDirection;
+          lastScatterResult = payload.scatterResult;
+        }
+        payload.rand = payload.scatterResult.rand;
+        rayDesc.TMax = 1e10f;
+
       } else {
         atLeastOneHit = true;
-        attenuation *= payload.scatterResult.attenuation;
-        rayDesc.Origin = payload.scatterResult.scatteredOrigin;
-        rayDesc.Direction = payload.scatterResult.scatteredDirection;
         lastScatterResult = payload.scatterResult;
         payload.rand = payload.scatterResult.rand;
+
+        if (payload.scatterResult.isObj) {
+          attenuation *= payload.scatterResult.attenuation;
+          rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+          rayDesc.Direction = payload.scatterResult.scatteredDirection;
+          continue;
+        }
+
+        // Check if Obj in between
+        rayDesc.TMax = payload.scatterResult.ray_t;
+        TraceRay(
+          world, // the tree
+          RAY_FLAG_FORCE_OPAQUE, // ray flags
+          0b00000001, // instance inclusion mask
+          0, // ray type
+          1, // number of ray types
+          0, // miss type
+          rayDesc, // the ray to trace
+          payload // the payload IO
+        );
+
+        if (payload.scatterResult.scatterEvent == 2) {
+          // No hit obj, continue with previous sampling
+          attenuation *= lastScatterResult.attenuation;
+          rayDesc.Origin = lastScatterResult.scatteredOrigin;
+          rayDesc.Direction = lastScatterResult.scatteredDirection;
+        }
+        else if (payload.scatterResult.scatterEvent == 0) {
+          break;
+          attenuation *= lastScatterResult.attenuation;
+          rayDesc.Origin = lastScatterResult.scatteredOrigin;
+          rayDesc.Direction = lastScatterResult.scatteredDirection;
+        }
+        else {
+          // Hit Obj
+          attenuation *= payload.scatterResult.attenuation;
+          rayDesc.Origin = payload.scatterResult.scatteredOrigin;
+          rayDesc.Direction = payload.scatterResult.scatteredDirection;
+          lastScatterResult = payload.scatterResult;
+        }
+        payload.rand = payload.scatterResult.rand;
+        rayDesc.TMax = 1e10f;
       }
 
       // Possibly terminate the path with Russian roulette
@@ -298,51 +436,6 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
   gprt::store(record.frameBuffer, fbOfs, gprt::make_rgba(total_payload_color * (float(1) / ((record.accId + 1) * TOTAL_SAMPLE_PER_PIXEL))));
 }
 
-float fmaf(float a, float b, float c)
-{
-  return a * b + c;
-}
-
-float __frcp_rn(float a)
-{
-  return 1 / a;
-}
-
-float reduce_max(float3 v) {
-  return max(max(v.x, v.y),v.z);
-}
-
-float reduce_min(float3 v) {
-  return min(min(v.x, v.y),v.z);
-}
-
-float2 intersect_box(float t0, float t1, float3 ray_org, float3 ray_dir, float3 lower, float3 upper)
-{
-  // Option 1
-  float float_large = 3.402823466e+38F;
-  float float_small = 1.175494351e-38F;
-  int3 is_small = int3(abs(ray_dir.x) < float_small, abs(ray_dir.y) < float_small, abs(ray_dir.z) < float_small);
-  float3 rcp_dir = float3(__frcp_rn(ray_dir.x), __frcp_rn(ray_dir.y), __frcp_rn(ray_dir.z));
-  float3 t_lo = float3(is_small.x ? float_large : (lower.x - ray_org.x) * rcp_dir.x, //
-                           is_small.y ? float_large : (lower.y - ray_org.y) * rcp_dir.y, //
-                           is_small.z ? float_large : (lower.z - ray_org.z) * rcp_dir.z  //
-  );
-  float3 t_hi = float3(is_small.x ? -float_large : (upper.x - ray_org.x) * rcp_dir.x, //
-                           is_small.y ? -float_large : (upper.y - ray_org.y) * rcp_dir.y, //
-                           is_small.z ? -float_large : (upper.z - ray_org.z) * rcp_dir.z  //
-  );
-  t0 = max(t0, reduce_max(min(t_lo, t_hi)));
-  t1 = min(t1, reduce_min(max(t_lo, t_hi)));
-
-  // Option 2
-  // float3 t_lo = (lower - ray_org) / ray_dir;
-  // float3 t_hi = (upper - ray_org) / ray_dir;
-  // t0 = max(t0, reduce_max(min(t_lo, t_hi)));
-  // t1 = min(t1, reduce_min(max(t_lo, t_hi)));
-
-  return float2(t0, t1);
-}
-
 // This intersection program will be called when rays hit our axis
 // aligned bounding boxes. Here, we can fetch per-geometry data and
 // process that data, but we do not have access to the ray payload
@@ -353,19 +446,15 @@ float2 intersect_box(float t0, float t1, float3 ray_org, float3 ray_dir, float3 
 GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record))
 {
   Attributes attr;
-  attr.color = float3(1000.f, 0.f, 0.f);
   attr.color = float3(0.f, 0.f, 0.f);
 
   float3 org = ObjectRayOrigin();
   float3 dir = ObjectRayDirection();
-  // org = WorldRayOrigin();
-  // dir = ObjectRayDirection();
+
   float3 aabb_lower = gprt::load<float3>(record.aabb_position, 0);
   float3 aabb_upper = gprt::load<float3>(record.aabb_position, 1);
   float3 lower = mul(aabb_lower, (float3x3)WorldToObject4x3());
   float3 upper = mul(aabb_upper, (float3x3)WorldToObject4x3());
-  // lower = aabb_lower;
-  // upper = aabb_upper;
 
   float t0 = RayTMin();
   float t1 = RayTCurrent();
@@ -386,19 +475,21 @@ float sample_volume_object_space(VolumesGeomData record, float3 p, inout RandSee
 
   // Texture
   Texture3D texture = gprt::getTexture3DHandle(record.volume);
-  SamplerState sampler = gprt::getSamplerHandle(record.samplers[0]);
-  p.x = (p.x + 0.5) / volume_size.x;
-  p.y = (p.y + 0.5) / volume_size.y;
-  p.z = (p.z + 0.5) / volume_size.z;
+  
+  // Use Sampler
+  // SamplerState sampler = gprt::getSamplerHandle(record.samplers[0]);
+  // p.x = clamp(p.x / volume_size.x, 0, 1);
+  // p.y = clamp(p.y / volume_size.y, 0, 1);
+  // p.z = clamp(p.z / volume_size.z, 0, 1);
+  // return texture.SampleLevel(sampler, p, 0);
 
-  return texture.SampleLevel(sampler, p, 0);
-
-  // rand = rand_generate(rand, 3);
-  // float3 new_gen = rand.random_number_3;
-  // new_gen.x = clamp(new_gen.x, 0, 1);
-  // new_gen.y = clamp(new_gen.y, 0, 1);
-  // new_gen.z = clamp(new_gen.z, 0, 1);
-  // return texture[p + new_gen];
+  // Read Data Directly + Random Shifting
+  rand = rand_generate(rand, 3);
+  float3 new_gen = rand.random_number_3;
+  new_gen.x = clamp(new_gen.x, 0, 1);
+  new_gen.y = clamp(new_gen.y, 0, 1);
+  new_gen.z = clamp(new_gen.z, 0, 1);
+  return texture[p + new_gen];
 } 
 
 float4 sample_transfer_function(VolumesGeomData record, float sample_point)
@@ -448,7 +539,7 @@ ScatterResult delta_tracking(VolumesGeomData record, Payload payload, float3 ray
     }
     result.rand = rand_generate(result.rand, 2);
   }
-  result.volume_t = t;
+  result.ray_t = t;
   result.volume_albedo = albedo;
   result.volume_hit = found_hit;
   return result;
@@ -469,8 +560,8 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
   ScatterResult result;
   float3 rayOrg = ObjectRayOrigin();
   float3 rayDir = ObjectRayDirection();
-  rayOrg = WorldRayOrigin();
-  rayDir = WorldRayDirection();
+  // rayOrg = WorldRayOrigin();
+  // rayDir = WorldRayDirection();
   
   // See if delta tracking returns hit
   result = delta_tracking(record, payload, rayOrg, rayDir, attributes.t_min, attributes.t_max);
@@ -478,14 +569,14 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
   // If not hit by delta tracking, return
   if (!result.volume_hit) {
     result.scatterEvent        = 0;
-    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.volume_t;
+    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.ray_t;
     result.scatteredDirection  = WorldRayDirection();
     result.isObj               = false;
   }
   // If hit by delta tracking, sample random direction
   else {
     result.scatterEvent        = 1;
-    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.volume_t;
+    result.scatteredOrigin     = WorldRayOrigin() + WorldRayDirection() * result.ray_t;
     result.rand                = rand_generate(result.rand, 2);
     result.scatteredDirection  = mul(uniform_sample_sphere(1, result.rand.random_number_2), (float3x3)ObjectToWorld4x3());
     result.attenuation         = result.volume_albedo;

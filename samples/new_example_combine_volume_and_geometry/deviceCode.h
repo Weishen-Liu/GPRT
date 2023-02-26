@@ -84,7 +84,6 @@ struct RayGenData
 
     alignas(16) gprt::Buffer frameBuffer;
 
-    alignas(16) gprt::Accel triangleWorld;
     alignas(16) gprt::Accel world;
 
     alignas(16) gprt::Buffer ambient_lights_intensity;
@@ -133,8 +132,8 @@ struct ScatterResult
     bool isObj;
     float3 normal;
     
+    float ray_t;
     bool volume_hit;
-    float volume_t;
     float3 volume_albedo;
 };
 
