@@ -13,6 +13,11 @@
 struct VulkanResources {
     ConfigureImgui configureImgui;
 
+    std::vector<uint32_t> maskTypes = {
+        0b11111111, // Obj & Volume
+        0b11111110  // Only Obj -> assign to Volume to hide Volume in Ray Trace
+    };
+
     struct Geometry{
         GPRTGeomOf<TrianglesGeomData> trianglesGeom;
         TrianglesGeomData *geomData;
@@ -91,14 +96,17 @@ struct VulkanResources {
 
     // Accel
     std::vector<float4x4> transformsObj;
-    GPRTBufferOf<float4x4> transformObjBuffer;
     std::vector<GPRTAccel> listOfTrianglesBLAS;
-    GPRTAccel trianglesTLAS;
 
     std::vector<float4x4> transformsVolume;
-    GPRTBufferOf<float4x4> transformVolumeBuffer;
     std::vector<GPRTAccel> listOfVolumesBLAS;
-    GPRTAccel aabbTLAS;
+
+    std::vector<float4x4> transformsObjAndVolume;
+    GPRTBufferOf<float4x4> transformObjAndVolumeBuffer;
+    std::vector<GPRTAccel> listOfObjAndVolumesBLAS;
+    GPRTAccel objAndVolumeTLAS;
+    std::vector<uint32_t> masksForObjAndVolume;
+    GPRTBufferOf<uint32_t> masksBuffer;
 
     // DataType
     MissProgData *missData;
@@ -125,9 +133,8 @@ struct VulkanResources {
 
     void initialVulkanResources(GPRTProgram new_example_deviceCode);
     void resetVulkanGeometryResources(GPRTProgram new_example_deviceCode);
-    void refreshObj();
     void refreshObjMaterial();
-    void refreshVolume();
+    void refreshObjAndVolume();
     void refreshLights();
     void updateGeometryMaterial(Geometry &geometry, Obj &obj);
     void updateVulkanResources();
@@ -135,8 +142,7 @@ struct VulkanResources {
     void buildSBT();
     void createGeometry(Obj &obj);
     void createVolume(Volume &volume);
-    void createAccel();
-    void createVolumeAccel();
+    void createVolumeAndGeometryAccel();
     void createMiss();
     void createRayGen();
     void destoryVulkanResources();

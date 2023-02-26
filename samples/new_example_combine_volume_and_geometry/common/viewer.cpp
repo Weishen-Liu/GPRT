@@ -325,14 +325,6 @@ void Viewer::init(GPRTProgram new_example_deviceCode)
                             cosFovy);
     vulkanResources.configureImgui.initObj();
     vulkanResources.configureImgui.initVolume();
-    // lookFrom = float3(288.962f, 70.1202f, 121.871f);
-    // lookAt = float3(423.f, 295.f, 105.f);
-    // lookUp = float3(0.38687627268161939f, 0.84789666508123507f, -0.36248861358682333f);
-    // cosFovy = 45;
-    // camera.setOrientation(lookFrom,
-    //                         lookAt,
-    //                         lookUp,
-    //                         cosFovy);
     // vulkanResources.configureImgui.initLight();
     deviceCode = new_example_deviceCode;
     vulkanResources.initialVulkanResources(deviceCode);
@@ -488,31 +480,31 @@ void Viewer::run()
         if (vulkanResources.configureImgui.updateObjSelection) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshObj();
+            vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateObjSelection = false;
         }
         else if (vulkanResources.configureImgui.updateObjTransform) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshObj();
+            vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateObjTransform = false;
         }
         else if (vulkanResources.configureImgui.updateObjMaterials) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshObjMaterial();
+            vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateObjMaterials = false;
         }
         else if (vulkanResources.configureImgui.updateVolumeSelection) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshVolume();
+            vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateVolumeSelection = false;
         }
         else if (vulkanResources.configureImgui.updateVolumeTransform) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshVolume();
+            vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateVolumeTransform = false;
         }
         else if (vulkanResources.configureImgui.updateLights) {
