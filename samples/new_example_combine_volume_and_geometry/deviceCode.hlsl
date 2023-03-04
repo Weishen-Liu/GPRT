@@ -358,10 +358,9 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         }
         else if (payload.scatterResult.scatterEvent == 0) {
           break;
-          rayDesc.Origin = leaveAABBOrigin;
-          rayDesc.Direction = leaveAABBDirection;
         }
         else {
+          atLeastOneHit = true;
           // Hit Obj
           attenuation *= payload.scatterResult.attenuation;
           rayDesc.Origin = payload.scatterResult.scatteredOrigin;
@@ -404,9 +403,6 @@ GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record))
         }
         else if (payload.scatterResult.scatterEvent == 0) {
           break;
-          attenuation *= lastScatterResult.attenuation;
-          rayDesc.Origin = lastScatterResult.scatteredOrigin;
-          rayDesc.Direction = lastScatterResult.scatteredDirection;
         }
         else {
           // Hit Obj

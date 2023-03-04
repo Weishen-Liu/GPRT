@@ -483,16 +483,28 @@ void Viewer::run()
             vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateObjSelection = false;
         }
-        else if (vulkanResources.configureImgui.updateObjTransform) {
+        else if (vulkanResources.configureImgui.updateObjTranslate) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshObjAndVolume();
-            vulkanResources.configureImgui.updateObjTransform = false;
+            vulkanResources.configureImgui.updateObjTranslate = false;
+        }
+        else if (vulkanResources.configureImgui.updateObjScale) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshObjAndVolume();
+            vulkanResources.configureImgui.updateObjScale = false;
+        }
+        else if (vulkanResources.configureImgui.updateObjRotate) {
+            firstFrame = true;
+            vulkanResources.configureImgui.accId = 0;
+            vulkanResources.refreshObjAndVolume();
+            vulkanResources.configureImgui.updateObjRotate = false;
         }
         else if (vulkanResources.configureImgui.updateObjMaterials) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
-            vulkanResources.refreshObjAndVolume();
+            vulkanResources.refreshObjMaterial();
             vulkanResources.configureImgui.updateObjMaterials = false;
         }
         else if (vulkanResources.configureImgui.updateVolumeSelection) {
@@ -501,12 +513,24 @@ void Viewer::run()
             vulkanResources.refreshObjAndVolume();
             vulkanResources.configureImgui.updateVolumeSelection = false;
         }
-        else if (vulkanResources.configureImgui.updateVolumeTransform) {
+        else if (vulkanResources.configureImgui.updateVolumeTranslate) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;
             vulkanResources.refreshObjAndVolume();
-            vulkanResources.configureImgui.updateVolumeTransform = false;
+            vulkanResources.configureImgui.updateVolumeTranslate = false;
         }
+        // else if (vulkanResources.configureImgui.updateVolumeScale) {
+        //     firstFrame = true;
+        //     vulkanResources.configureImgui.accId = 0;
+        //     vulkanResources.refreshObjAndVolume();
+        //     vulkanResources.configureImgui.updateVolumeScale = false;
+        // }
+        // else if (vulkanResources.configureImgui.updateVolumeRotate) {
+        //     firstFrame = true;
+        //     vulkanResources.configureImgui.accId = 0;
+        //     vulkanResources.refreshObjAndVolume();
+        //     vulkanResources.configureImgui.updateVolumeRotate = false;
+        // }
         else if (vulkanResources.configureImgui.updateLights) {
             firstFrame = true;
             vulkanResources.configureImgui.accId = 0;

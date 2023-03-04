@@ -98,7 +98,9 @@ void ConfigureImgui::createDefaultInstance(T& target)
     for (int i = 0; i < target.generateInstance; i++)
     {
         Instance instance;
-        instance.transform = target.defaultTransform;
+        instance.translate = target.defaultTranslate;
+        instance.scale = target.defaultScale;
+        instance.rotate = target.defaultRotate;
         instance.name = target.name + " " +std::to_string(target.instanceUniqueName);
         target.instanceUniqueName++;
         target.instances.push_back(instance);
@@ -163,7 +165,7 @@ void ConfigureImgui::objInstances()
             }
             addObjInstance(LIST_OF_OBJS[eachObj]);
 
-            // Configure Instance Transform
+            // Configure Instance Translate
             ImGui::Text("Loaded "); ImGui::SameLine();
             if (ImGui::BeginCombo(" Instance", LIST_OF_OBJS[eachObj].current_instance)) // The second parameter is the label previewed before opening the combo.
             {
@@ -249,7 +251,7 @@ void ConfigureImgui::volumeInstances()
             }
             addVolumeInstance(LIST_OF_VOLUMES[eachVolume]);
 
-            // Configure Instance Transform
+            // Configure Instance Translate
             ImGui::Text("Loaded "); ImGui::SameLine();
             if (ImGui::BeginCombo(" Instance", LIST_OF_VOLUMES[eachVolume].current_instance)) // The second parameter is the label previewed before opening the combo.
             {
@@ -314,12 +316,17 @@ void ConfigureImgui::inputAndSlider(float3& source, float min_v, float max_v, co
 
 void ConfigureImgui::updateTransform(Obj& obj)
 {
-    inputAndSlider(obj.instances[obj.current_instance_index].transform, -100000.f, 100000.f, "Transform", "Transform Input", "Transform Slider", updateObjTransform);
+    inputAndSlider(obj.instances[obj.current_instance_index].translate, -100000.f, 100000.f, "Translate", "Translate Input", "Translate Slider", updateObjTranslate);
+    inputAndSlider(obj.instances[obj.current_instance_index].scale, 1.f, 100000.f, "Scale", "Scale Input", "Scale Slider", updateObjScale);
+    inputAndSlider(obj.instances[obj.current_instance_index].rotate, -10.f, 10.f, "Rotate", "Rotate Input", "Rotate Slider", updateObjRotate);
 }
 
 void ConfigureImgui::updateTransform(Volume& volume)
 {
-    inputAndSlider(volume.instances[volume.current_instance_index].transform, -100000.f, 100000.f, "Transform", "Transform Input", "Transform Slider", updateVolumeTransform);
+    inputAndSlider(volume.instances[volume.current_instance_index].translate, -100000.f, 100000.f, "Translate", "Translate Input", "Translate Slider", updateVolumeTranslate);
+    // Current no use cases
+    // inputAndSlider(volume.instances[volume.current_instance_index].scale, 1.f, 100000.f, "Scale", "Scale Input", "Scale Slider", updateVolumeScale);
+    // inputAndSlider(volume.instances[volume.current_instance_index].rotate, -10.f, 10.f, "Rotate", "Rotate Input", "Rotate Slider", updateVolumeRotate);
 }
 
 void ConfigureImgui::updateMaterialDetail(Obj& obj)

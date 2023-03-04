@@ -24,7 +24,9 @@ struct Material
 struct Instance {
     std::string name;
     bool choosed = false;
-    float3 transform;
+    float3 translate;
+    float3 scale;
+    float3 rotate;
 };
 
 struct Obj {
@@ -40,7 +42,9 @@ struct Obj {
     const char* current_instance_material = NULL;
     int current_instance_index = -1;
     int instanceUniqueName = 0;
-    float3 defaultTransform = float3(0.f, 0.f, 0.f);
+    float3 defaultTranslate = float3(0.f, 0.f, 0.f);
+    float3 defaultScale = float3(1.f, 1.f, 1.f);
+    float3 defaultRotate = float3(0.f, 0.f, 0.f);
     int generateInstance = 1;
 };
 
@@ -77,7 +81,9 @@ struct Volume {
     const char* current_instance = NULL;
     int current_instance_index = -1;
     int instanceUniqueName = 0;
-    float3 defaultTransform = float3(0.f, 0.f, 0.f);
+    float3 defaultTranslate = float3(0.f, 0.f, 0.f);
+    float3 defaultScale = float3(1.f, 1.f, 1.f);
+    float3 defaultRotate = float3(0.f, 0.f, 0.f);
     int generateInstance = 1;
 };
 
@@ -157,11 +163,15 @@ struct ConfigureImgui {
     bool addNewLight = false;
 
     bool updateObjSelection = false;
-    bool updateObjTransform = false;
+    bool updateObjTranslate = false;
+    bool updateObjScale = false;
+    bool updateObjRotate = false;
     bool updateObjMaterials = false;  
 
     bool updateVolumeSelection = false;
-    bool updateVolumeTransform = false;
+    bool updateVolumeTranslate = false;
+    bool updateVolumeScale = false;
+    bool updateVolumeRotate = false;
     bool updateLights = false;
 
     void render();
@@ -192,6 +202,7 @@ struct ConfigureImgui {
     void createDefaultInstance(T& target);
 
     void inputAndSlider(float3& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger);
+    void inputAndSlider(float4& source, float min_v, float max_v, const char *title, const char *inputLabel, const char *sliderLabel, bool& trigger);
 };
 
 #endif
