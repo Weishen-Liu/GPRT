@@ -257,10 +257,10 @@ void VulkanResources::refreshObjMaterial()
 void VulkanResources::refreshObjAndVolume()
 {
     listOfVolumesBLAS = {};
-    transformsVolume = {};
     listOfTrianglesBLAS = {};
-    transformsObj = {};
     listOfObjAndVolumesBLAS = {};
+    transformsVolume = {};
+    transformsObj = {};
     transformsObjAndVolume = {};
     masksForObjAndVolume = {};
 
@@ -366,7 +366,16 @@ void VulkanResources::createVolumeAndGeometryAccel() {
             if (eachInstance.choosed)
             {
                 listOfTrianglesBLAS.push_back(listOfGeometry[i].trianglesBLAS);
-                transformsObj.push_back(transpose(translation_matrix(eachInstance.transform)));
+                float4x4 translateMatrix = translation_matrix(eachInstance.translate);
+                float3 axisX = float3(1.f, 0.f, 0.f);
+                float3 axisY = float3(0.f, 1.f, 0.f);
+                float3 axisZ = float3(0.f, 0.f, 1.f);
+                float4x4 rotateX = rotation_matrix(rotation_quat(axisX, eachInstance.rotate.x));
+                float4x4 rotateY = rotation_matrix(rotation_quat(axisY, eachInstance.rotate.y));
+                float4x4 rotateZ = rotation_matrix(rotation_quat(axisZ, eachInstance.rotate.z));
+                float4x4 rotateMatrix = mul(rotateZ, mul(rotateY, rotateX));
+                float4x4 scaleMatrix = scaling_matrix(eachInstance.scale);
+                transformsObj.push_back(mul(scaleMatrix, mul(rotateMatrix, transpose(translateMatrix))));
             }
         }
     }
@@ -378,7 +387,16 @@ void VulkanResources::createVolumeAndGeometryAccel() {
             if (eachInstance.choosed)
             {
                 listOfVolumesBLAS.push_back(listOfGeometryVolume[i].aabbBLAS);
-                transformsVolume.push_back(transpose(translation_matrix(eachInstance.transform)));
+                float4x4 translateMatrix = translation_matrix(eachInstance.translate);
+                float3 axisX = float3(1.f, 0.f, 0.f);
+                float3 axisY = float3(0.f, 1.f, 0.f);
+                float3 axisZ = float3(0.f, 0.f, 1.f);
+                float4x4 rotateX = rotation_matrix(rotation_quat(axisX, eachInstance.rotate.x));
+                float4x4 rotateY = rotation_matrix(rotation_quat(axisY, eachInstance.rotate.y));
+                float4x4 rotateZ = rotation_matrix(rotation_quat(axisZ, eachInstance.rotate.z));
+                float4x4 rotateMatrix = mul(rotateZ, mul(rotateY, rotateX));
+                float4x4 scaleMatrix = scaling_matrix(eachInstance.scale);
+                transformsVolume.push_back(mul(scaleMatrix, mul(rotateMatrix, transpose(translateMatrix))));
             }
         }
     }
