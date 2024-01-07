@@ -96,6 +96,20 @@ ENDIF()
 # Find Vulkan Memory Allocator
 add_subdirectory(vma)
 
+# Find gdt
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/gdt EXCLUDE_FROM_ALL)
+
+# Find Colormaps
+set(TFNMODULE_INCLUDE ${CMAKE_CURRENT_LIST_DIR}/tfn/colormaps)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tfn/colormaps)
+add_library(tfnmodule ${embedded_colormap})
+target_include_directories(tfnmodule PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/tfn/colormaps>
+)
+set_target_properties(tfnmodule PROPERTIES 
+  POSITION_INDEPENDENT_CODE ON
+)
+
 # Find STB Image
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/stb_image EXCLUDE_FROM_ALL)
 

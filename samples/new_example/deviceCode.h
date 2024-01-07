@@ -26,96 +26,88 @@
 
 /* variables available to all programs */
 
-
 /* variables for the triangle mesh geometry */
-struct TrianglesGeomData
-{
-    /*! array/buffer of vertex indices */
-    alignas(16) gprt::Buffer index; // vec3i*
-    /*! array/buffer of vertex positions */
-    alignas(16) gprt::Buffer vertex; // vec3f *
-    /*! array/buffer of vertex normal */
-    alignas(16) gprt::Buffer normal; // vec3f *
+struct TrianglesGeomData {
+  /*! array/buffer of vertex indices */
+  gprt::Buffer index;   // vec3i*
+  /*! array/buffer of vertex positions */
+  gprt::Buffer vertex;   // vec3f *
+  /*! array/buffer of vertex normal */
+  gprt::Buffer normal;   // vec3f *
 
-    // /*! base color we use for the entire mesh */
-    // alignas(16) float3 color;
-    /*! array/buffer of color */
-    alignas(16) gprt::Buffer color; // vec3f *
+  // /*! base color we use for the entire mesh */
+  // float3 color;
+  /*! array/buffer of color */
+  gprt::Buffer color;   // vec3f *
 
-    alignas(16) gprt::Buffer material_type; // vec3f *
-    alignas(16) gprt::Buffer lambertian;    // vec3f *
-    alignas(16) gprt::Buffer metal_albedo;  // vec3f *
-    alignas(16) gprt::Buffer metal_fuzz;    // vec3f *
-    alignas(16) gprt::Buffer dielectric;    // vec3f *
+  gprt::Buffer material_type;   // vec3f *
+  gprt::Buffer lambertian;      // vec3f *
+  gprt::Buffer metal_albedo;    // vec3f *
+  gprt::Buffer metal_fuzz;      // vec3f *
+  gprt::Buffer dielectric;      // vec3f *
 
-    struct
-    {
-        alignas(16) int    type;
-        alignas(16) float3 lambertian_albedo;
-        alignas(16) float3 metal_albedo;
-        alignas(16) float  metal_fuzz;
-        alignas(16) float  dielectric_ref_idx;
-    } material;
+  struct {
+    int type;
+    float3 lambertian_albedo;
+    float3 metal_albedo;
+    float metal_fuzz;
+    float dielectric_ref_idx;
+  } material;
 };
 
-struct RayGenData
-{
-    alignas(16) gprt::Buffer accBuffer;
-    alignas(16) int accId;
+struct RayGenData {
+  gprt::Buffer accBuffer;
+  int accId;
 
-    alignas(16) gprt::Buffer frameBuffer;
+  gprt::Buffer frameBuffer;
 
-    alignas(16) gprt::Accel world;
+  gprt::Accel world;
 
-    alignas(16) gprt::Buffer ambient_lights_intensity;
-    alignas(16) int ambient_light_size;
+  gprt::Buffer ambient_lights_intensity;
+  int ambient_light_size;
 
-    alignas(16) gprt::Buffer directional_lights_intensity;
-    alignas(16) gprt::Buffer directional_lights_dir;
-    alignas(16) int directional_light_size;
+  gprt::Buffer directional_lights_intensity;
+  gprt::Buffer directional_lights_dir;
+  int directional_light_size;
 
-    struct
-    {
-        alignas(16) float3 pos;
-        alignas(16) float3 dir_00;
-        alignas(16) float3 dir_du;
-        alignas(16) float3 dir_dv;
-    } camera;
+  struct {
+    float3 pos;
+    float3 dir_00;
+    float3 dir_du;
+    float3 dir_dv;
+  } camera;
 };
 
 /* variables for the miss program */
-struct MissProgData
-{
-    alignas(16) float3 color0;
-    alignas(16) float3 color1;
+struct MissProgData {
+  float3 color0;
+  float3 color1;
 };
 
 struct RandSeed {
-    uint state;
-    float random_number;
-    float2 random_number_2;
-    float3 random_number_3;
+  uint state;
+  float random_number;
+  float2 random_number_2;
+  float3 random_number_3;
 
-    float3 rayDescOrg;
-    float3 rayDescDir;
-    float3 bidir_total_color;
-    float3 total_color_from_light;
+  float3 rayDescOrg;
+  float3 rayDescDir;
+  float3 bidir_total_color;
+  float3 total_color_from_light;
 };
 
-struct ScatterResult
-{
-    int scatterEvent;
-    float3 scatteredOrigin;
-    float3 scatteredDirection;
-    float3 attenuation;
-    float3 normal;
-    RandSeed rand;
+struct ScatterResult {
+  int scatterEvent;
+  float3 scatteredOrigin;
+  float3 scatteredDirection;
+  float3 attenuation;
+  float3 normal;
+  RandSeed rand;
 };
 
-struct Payload
-{
-    float3 color;
-    ScatterResult scatterResult;
-    RandSeed rand;
-};
+// struct Payload {
+//   float3 color;
+//   ScatterResult scatterResult;
+//   RandSeed rand;
+// };
 #endif
