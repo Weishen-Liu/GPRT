@@ -274,7 +274,7 @@ GPRT_CLOSEST_HIT_PROGRAM(TriangleMesh, (TrianglesGeomData, record), (Payload, pa
   payload.scatterResult.isObj = true;
   payload.scatterResult.scatteredOrigin = WorldRayOrigin() + WorldRayDirection() * tHit;
   payload.scatterResult.scatteredDirection =
-      mul(payload.scatterResult.scatteredDirection, (float3x3) ObjectToWorld4x3());
+      mul((float3x3) ObjectToWorld4x3(), payload.scatterResult.scatteredDirection);
 }
 
 GPRT_RAYGEN_PROGRAM(simpleRayGen, (RayGenData, record)) {
@@ -436,13 +436,18 @@ GPRT_INTERSECTION_PROGRAM(AABBIntersection, (VolumesGeomData, record)) {
 
   float3 aabb_lower = gprt::load<float3>(record.aabb_position, 0);
   float3 aabb_upper = gprt::load<float3>(record.aabb_position, 1);
-  float3 lower = mul(aabb_lower, (float3x3) WorldToObject4x3());
-  float3 upper = mul(aabb_upper, (float3x3) WorldToObject4x3());
+
+  float3 compute_lower =
+      float3(min(aabb_lower.x, aabb_upper.x), min(aabb_lower.y, aabb_upper.y), min(aabb_lower.z, aabb_upper.z));
+  float3 compute_upper =
+      float3(max(aabb_lower.x, aabb_upper.x), max(aabb_lower.y, aabb_upper.y), max(aabb_lower.z, aabb_upper.z));
+  // float3 lower = mul((float3x3) WorldToObject4x3(), compute_lower);
+  // float3 upper = mul((float3x3) WorldToObject4x3(), compute_upper);
 
   float t0 = RayTMin();
   float t1 = RayTCurrent();
 
-  float2 t_result = intersect_box(t0, t1, org, dir, lower, upper);
+  float2 t_result = intersect_box(t0, t1, org, dir, compute_lower, compute_upper);
   if (t_result.y > t_result.x) {
     attr.t_min = t_result.x;
     attr.t_max = t_result.y;
@@ -562,7 +567,7 @@ GPRT_CLOSEST_HIT_PROGRAM(AABBClosestHit, (VolumesGeomData, record), (Payload, pa
     result.scatteredOrigin = WorldRayOrigin() + WorldRayDirection() * result.ray_t;
     result.rand = rand_generate(result.rand, 2);
     result.scatteredDirection =
-        mul(uniform_sample_sphere(1, result.rand.random_number_2), (float3x3) ObjectToWorld4x3());
+        mul((float3x3) ObjectToWorld4x3(), uniform_sample_sphere(1, result.rand.random_number_2));
     result.attenuation = result.volume_albedo;
     result.isObj = false;
   }
