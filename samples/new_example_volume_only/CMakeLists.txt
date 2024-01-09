@@ -20,23 +20,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_subdirectory(s00-rayGenOnly)
-add_subdirectory(s01-singleTriangle)
-add_subdirectory(s02-instances)
-add_subdirectory(s03-singleAABB)
-add_subdirectory(s04-computeAABBs)
-add_subdirectory(s05-computeVertex)
-add_subdirectory(s06-computeTransform)
-add_subdirectory(s07-multipleGeometry)
-add_subdirectory(s08-singleTexture)
-add_subdirectory(s09-visibilityMasks)
-add_subdirectory(s10-rasterization)
-add_subdirectory(s11-imgui)
-add_subdirectory(s12-swBVH)
+embed_devicecode(
+  OUTPUT_TARGET
+  new_example_volume_only_deviceCode
+  ENTRY_POINTS
+    simpleRayGen
+  SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/shareDeviceCode.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/deviceCode.hlsl
+)
 
-add_subdirectory(new_example)
-add_subdirectory(new_example_volume)
-add_subdirectory(new_example_volume_with_texture)
-add_subdirectory(new_example_combine_volume_and_geometry)
-add_subdirectory(new_example_volume_only)
-
+add_executable(new_example_volume_only  hostCode.cpp common/viewer.cpp common/configureImgui.cpp common/processVulkanResources.cpp common/jsonLoader.cpp)
+target_include_directories(new_example_volume_only  PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(new_example_volume_only  PUBLIC ${CMAKE_CURRENT_LIST_DIR}/..)
+target_link_libraries(new_example_volume_only 
+  PRIVATE
+  new_example_volume_only_deviceCode
+    gprt::gprt
+    glfw
+    tiny_obj_loader
+    stb_image
+    ${OPENGL_gl_LIBRARY}
+    stdc++fs
+    tfnmodule
+    gdt
+)
